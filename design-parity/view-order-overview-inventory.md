@@ -141,7 +141,8 @@ Figma components, which is why the ad-hoc reproduction drifted). Verified via De
 figma-console bridge against the current nodes (Scheduled Ov1 `1094:86645`):
 
 - **Order Overview Card** is now component `1452:181082` (instance in Scheduled Ov1 `1452:182257`).
-- **Pickup Code** is now component `Picup Code Banner` `1454:207769` (sic).
+- **Pickup Code** is now component `Pickup Code Banner` `1454:207769` (renamed from the
+  earlier "Picup Code Banner" typo, corrected in Figma 2026-07-27).
 - **Body sections** are now `Order Detail Accordions` (instances `1454:196201` etc.).
 
 Applied corrections (playground `OrderDetailDrawer.tsx`):

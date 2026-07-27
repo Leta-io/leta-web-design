@@ -31,11 +31,11 @@
       "occurrences": 12
     },
     {
-      "name": "Picup Code Banner",
+      "name": "Pickup Code Banner",
       "sourceFiles": ["LETA Playground — Order Management / Order Management Components / Miscellaneous order view components (1454:207950)"],
       "nodeId": "1454:207769",
       "componentType": "COMPONENT",
-      "description": "Real, reusable local Figma component (not an ad-hoc reconstruction) — supersedes the prior 'Pickup Code digits' ad-hoc entry (stale nodeId 271:36357, from the original Overview wireframe before the designer componentized it). Lavender --surface-secondary-bg-raised card, radius --rounding-lg, pad 16px 20px; dark-navy --surface-secondary-bg digit boxes (radius --rounding-md) with white --text-on-color-label text; title in --text-secondary-label; Plain Copy-Outline button. Implemented in OrderDetailDrawer.tsx (the pickup-code banner block, rebuilt to match this component 2026-07-21 per the 13-screen reconciliation pass).",
+      "description": "Real, reusable local Figma component (renamed in Figma from the earlier 'Picup Code Banner' typo on 2026-07-27) — supersedes the prior 'Pickup Code digits' ad-hoc entry (stale nodeId 271:36357, from the original Overview wireframe before the designer componentized it). Lavender --surface-secondary-bg-raised card, radius --rounding-lg, pad 16px 20px; dark-navy --surface-secondary-bg digit boxes (radius --rounding-md) with white --text-on-color-label text; title in --text-secondary-label; Plain Copy-Outline button. Implemented in OrderDetailDrawer.tsx (the pickup-code banner block, rebuilt to match this component 2026-07-21 per the 13-screen reconciliation pass).",
       "firstSeen": "2026-07-20",
       "reconciledAgainstRealComponent": "2026-07-21",
       "occurrences": 6

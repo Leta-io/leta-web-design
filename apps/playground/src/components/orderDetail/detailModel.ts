@@ -321,7 +321,9 @@ export function buildOrderDetail(
       : creator.source === 'storefront'
         ? 'Auto-create · From online store'
         : 'Auto-create · From connected app',
-    createdByIcon: humanCreator ? { icon: 'User-Available', outlined: true } : { icon: 'Integration', outlined: false },
+    // Figma More Info rows: a human creator gets plain `User-Outline`, an
+    // automated one the filled `Integration` glyph (which has no outline sibling).
+    createdByIcon: humanCreator ? { icon: 'User', outlined: true } : { icon: 'Integration', outlined: false },
     dispatchedLabel: dispatched ? formatDateTime(dispatchTime) : 'N/A',
     dispatchedByLabel: dispatched ? 'Jude Bello' : 'N/A',
     deliveredLabel: status === 'delivered' || status === 'cancelled' ? formatDateTime(terminal) : 'N/A',
