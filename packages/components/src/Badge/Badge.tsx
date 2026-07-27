@@ -82,11 +82,20 @@ export interface BadgeProps
   leadingIcon?: IconName;
   /** Icon rendered after the label (Figma "Trailing Icon" type). */
   trailingIcon?: IconName;
+  /**
+   * Render the badge's icon(s) outlined rather than filled. Defaults to
+   * **filled**, matching Figma's Delivery Badges (`68:36703`), whose icon
+   * instances are all filled glyphs (`Icon/Return`, `Icon/Broadcast`,
+   * `Icon/Check-Circle` — never the `-Outline` siblings). Mirrors `Button`'s
+   * `iconOutlined`: without an explicit value the library-wide outlined default
+   * would silently flip these to the thinner outline glyph.
+   */
+  iconOutlined?: boolean;
 }
 
 export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
   function Badge(
-    { label, color = 'neutral', leadingIcon, trailingIcon, className, style, ...rest },
+    { label, color = 'neutral', leadingIcon, trailingIcon, iconOutlined = false, className, style, ...rest },
     ref,
   ) {
     const iconColor = ICON_COLOR[color];
@@ -114,9 +123,9 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
         }}
         {...rest}
       >
-        {leadingIcon && <Icon name={leadingIcon} size={12} color={iconColor} />}
+        {leadingIcon && <Icon name={leadingIcon} outlined={iconOutlined} size={12} color={iconColor} />}
         {label}
-        {trailingIcon && <Icon name={trailingIcon} size={12} color={iconColor} />}
+        {trailingIcon && <Icon name={trailingIcon} outlined={iconOutlined} size={12} color={iconColor} />}
       </span>
     );
   },
