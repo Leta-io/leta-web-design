@@ -211,29 +211,38 @@ function ProofRow({ file, onView }: { file: ProofFile; onView: (f: ProofFile) =>
   );
 }
 
-/** The SLA block (summary card top): eyebrow + ⓘ, counter, trailing badge. */
+/**
+ * **SLA Visibility** (Order Overview Card `1452:181083`) — a vertical gap-8
+ * stack: an `Eyebrow` row (label + ⓘ), then the `Metric` row. The SLA badge sits
+ * on the **Metric row**, `space-between` against the counter and vertically
+ * centred with it — NOT up beside the eyebrow.
+ */
 function SlaBlock({ model, elapsed }: { model: OrderDetailModel; elapsed: number }): React.ReactElement {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-4px)' }}>
-          <span className="text-label-m-regular" style={{ color: 'var(--text-default-eyebrow-text)' }}>
-            {slaHeadline(model.order.status)}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', width: '100%' }}>
+      {/* Content > Eyebrow */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-4px)' }}>
+        <span className="text-label-m-regular" style={{ color: 'var(--text-default-eyebrow-text)' }}>
+          {slaHeadline(model.order.status)}
+        </span>
+        <HoverTip label="Time spent fulfilling this order, against its SLA.">
+          <span style={{ display: 'flex', color: 'var(--icons-neutral-idle)' }}>
+            <Icon name="Question" outlined size={16} />
           </span>
-          <HoverTip label="Time spent fulfilling this order, against its SLA.">
-            <span style={{ display: 'flex', color: 'var(--icons-neutral-idle)' }}>
-              <Icon name="Question" outlined size={16} />
-            </span>
-          </HoverTip>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-4px)' }}>
+        </HoverTip>
+      </div>
+      {/* Metric — counter | SLA badge */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-8px)', width: '100%' }}>
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-4px)', minWidth: 0 }}>
           <span className="text-heading-s-semibold" style={{ color: 'var(--text-default-heading)' }}>
             {fmtClock(elapsed)}
           </span>
           <span className="text-body-m-regular" style={{ color: 'var(--text-default-helper)' }}> / 30m SLA</span>
-        </div>
+        </span>
+        {model.slaBadge && (
+          <Badge color={model.slaBadge.color} label={model.slaBadge.label} leadingIcon={model.slaBadge.icon} />
+        )}
       </div>
-      {model.slaBadge && <Badge color={model.slaBadge.color} label={model.slaBadge.label} />}
     </div>
   );
 }
@@ -473,7 +482,9 @@ function DrawerBody({
           flexShrink: 0,
         }}
       >
-        <div style={{ width: '50%', flexShrink: 0 }}>
+        {/* Map half — Figma gives BOTH halves their own 1px border, so the two
+            meet as a vertical divider down the middle of the card. */}
+        <div style={{ width: '50%', flexShrink: 0, borderRight: 'var(--stroke-xs) solid var(--border-neutral-default)' }}>
           <OrderMiniMap order={order} depotName={depotName} depotAddress={depotAddress} onExpand={() => setMapExpanded(true)} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, padding: 'var(--padding-16px) var(--padding-20px)', gap: 'var(--spacing-20px)' }}>

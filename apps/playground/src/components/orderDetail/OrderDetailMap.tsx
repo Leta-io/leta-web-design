@@ -182,10 +182,13 @@ function markerSpecs(o: Order): MapMarkerSpec[] {
       id: 'dropoff',
       lat: o.dropoff.lat,
       lng: o.dropoff.lng,
+      // Glyphs per the Order Overview Card (`1452:181083`): a failed drop-off is
+      // `Cancel-Circle` on error red (#cd3234), a completed one `Check-Circle`
+      // on success green (#50a20f); otherwise the plain navy location pin.
       icon: rs.failedDropoff
-        ? { variant: 'object-pin', icon: 'Cancel', color: 'var(--surface-error-bg)' }
+        ? { variant: 'object-pin', icon: 'Cancel-Circle', color: 'var(--surface-error-bg)' }
         : rs.delivered
-          ? { variant: 'object-pin', icon: 'Check', color: 'var(--surface-success-bg)' }
+          ? { variant: 'object-pin', icon: 'Check-Circle', color: 'var(--surface-success-bg)' }
           : { variant: 'object-pin', icon: 'Location', color: 'var(--surface-secondary-bg)' },
     },
   ];

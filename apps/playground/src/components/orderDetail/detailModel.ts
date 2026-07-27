@@ -95,7 +95,10 @@ export interface OrderDetailModel {
   scheduledTooltip: string;
   /** SLA */
   sla: SlaState;
-  slaBadge: { label: string; color: 'success' | 'warning' | 'error' | 'neutral' } | null;
+  /** SLA badge — every state pairs a leading icon with the label (Order Overview
+   *  Card `1452:181083`: On-Time→Check-Circle, At Risk→Warning, Delayed→Error,
+   *  Returned→History). All filled glyphs. */
+  slaBadge: { label: string; color: 'success' | 'warning' | 'error' | 'neutral'; icon: IconName } | null;
   /** Elapsed seconds base for the counter (static/frozen for terminal states). */
   elapsedBase: number;
   ticks: boolean;
@@ -192,12 +195,12 @@ export function buildOrderDetail(
     status === 'scheduled'
       ? null
       : status === 'returned'
-        ? { label: `Prev: ${fmtClock(durationSecondsFor(order, 'delayed', true))}`, color: 'neutral' }
+        ? { label: `Prev: ${fmtClock(durationSecondsFor(order, 'delayed', true))}`, color: 'neutral', icon: 'History' }
         : sla === 'delayed'
-          ? { label: 'Delayed', color: 'error' }
+          ? { label: 'Delayed', color: 'error', icon: 'Error' }
           : sla === 'at-risk'
-            ? { label: 'At Risk', color: 'warning' }
-            : { label: 'On-Time', color: 'success' };
+            ? { label: 'At Risk', color: 'warning', icon: 'Warning' }
+            : { label: 'On-Time', color: 'success', icon: 'Check-Circle' };
 
   // Est window: scheduled slot time + 10 minutes ("12:30 - 12:40 PM" — the
   // start drops its meridiem when both ends share it, per the wireframe).
