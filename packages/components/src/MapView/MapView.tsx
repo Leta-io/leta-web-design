@@ -131,7 +131,10 @@ export const MapView = React.forwardRef<HTMLDivElement, MapViewProps>(function M
       style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', ...style }}
       {...rest}
     >
-      <div ref={containerRef} style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--surface-neutral-bg-tertiary)' }} />
+      {/* Backdrop behind the tiles while they load. `--surface-neutral-bg-muted`
+          is the real grey token — `--surface-neutral-bg-tertiary` does not exist
+          and silently resolved to transparent (cf. the `bg-primary` gotcha). */}
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--surface-neutral-bg-muted)' }} />
       {showZoomControl && (
         <div style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 500 }}>
           <MapZoomControl

@@ -129,7 +129,9 @@ function defaultBody(variant: ModalDialogVariant, imageSrc?: string, signatureSr
           style={{
             ...RECT,
             backgroundImage: `url(${imageSrc ?? DOORSTEP_DELIVERY_IMAGE})`,
-            backgroundColor: 'var(--surface-neutral-bg-tertiary)',
+            // Grey backdrop while the image loads (`--surface-neutral-bg-tertiary`
+            // is not a real token — it resolved to transparent).
+            backgroundColor: 'var(--surface-neutral-bg-muted)',
             boxShadow: 'inset 0 0 0 var(--stroke-xs) var(--border-neutral-default)',
           }}
         />

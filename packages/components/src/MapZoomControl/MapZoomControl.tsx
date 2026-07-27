@@ -90,7 +90,9 @@ export const MapZoomControl = React.forwardRef<HTMLDivElement, MapZoomControlPro
             flexShrink: 0,
           }}
         >
-          <Icon name="Add" size={24} />
+          {/* Figma uses the filled `material-symbols:add-rounded` glyph; the
+              library-wide outlined default would render a thinner plus. */}
+          <Icon name="Add" outlined={false} size={24} />
         </button>
 
         <div
@@ -126,7 +128,8 @@ export const MapZoomControl = React.forwardRef<HTMLDivElement, MapZoomControlPro
             flexShrink: 0,
           }}
         >
-          <Icon name="Minus" size={24} />
+          {/* Filled `material-symbols:remove-rounded`, per Figma — see Zoom in. */}
+          <Icon name="Minus" outlined={false} size={24} />
         </button>
       </div>
     );

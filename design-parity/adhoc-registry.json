@@ -39,6 +39,24 @@
       "occurrences": 6
     },
     {
+      "name": "Map Legend",
+      "sourceFiles": ["LETA Playground — Order Management / Expanded Map Modals (1522:115768)"],
+      "nodeId": "1528:119929",
+      "componentType": "COMPONENT_SET",
+      "description": "Real, reusable local Figma component — the route key pill pinned bottom-centre of the expanded order map. Property 1=1 Route / 2 Routes. Pill: --surface-neutral-bg-default, 1px --border-neutral-default, --rounding-round, height 40, pad [10,16], gap 16. Each item = a 32px sample line + Label/S/Medium caption: 'Planned Route' (dark #192037, dashed 3/3) and 'Driven Route' (red #ff3941, solid), split by a 20px vertical demarcator. Shown only when a route is drawn — hidden pre-dispatch and for cancelled-before-dispatch. Implemented as the local MapLegend in apps/playground/src/components/orderDetail/OrderDetailMap.tsx.",
+      "firstSeen": "2026-07-27",
+      "occurrences": 7
+    },
+    {
+      "name": "Map Fixed Banners",
+      "sourceFiles": ["LETA Playground — Order Management / Expanded Map Modals (1522:115768)"],
+      "nodeId": "1528:120794",
+      "componentType": "COMPONENT_SET",
+      "description": "Real, reusable local Figma component — the dark status banner pinned top-centre of the expanded order map. 9 variants (Unassigned · Returned · Assigned · At Depot · In Transit · Arrived · Returning · Delivered · Cancelled). 480×44, HORIZONTAL gap 16, pad [12,16], --rounding-lg, fill --surface-secondary-bg (#192037); leading 18px icon + Body/M/Regular --text-on-color-label copy, a 20px vertical demarcator, then a trailing Desktop Button (Plain/Small, underlined, white label) reading Dispatch or View Activity. Implemented as the local MapFixedBanner in OrderDetailMap.tsx (Plain button recoloured for the dark surface via the --leta-btn-text custom properties).",
+      "firstSeen": "2026-07-27",
+      "occurrences": 9
+    },
+    {
       "name": "Proof image row (Base Card)",
       "sourceFiles": ["LETA Playground — View Order Drawer/Overview (320:99590)"],
       "nodeId": "1418:458603",
@@ -51,9 +69,9 @@
       "sourceFiles": ["LETA Playground — Order Management / Order Management Components / Miscellaneous order view components (1454:207950)"],
       "nodeId": "1454:207949",
       "componentType": "COMPONENT_SET",
-      "description": "Real, reusable local Figma component (not an ad-hoc reconstruction) — supersedes the prior 'Expanded-map info card' ad-hoc entry (stale nodeId 1419:462091, from the original Overview wireframe before the designer componentized it). Property 1=Pickup / Property 1=Drop-off variants: white floating card affixed to a map pin — leading icon tile + name + truncated address. Implemented in OrderDetailMap.tsx's expanded-map info cards affixed to the depot/drop-off pins.",
+      "description": "Real, reusable local Figma component (not an ad-hoc reconstruction) — supersedes the prior 'Expanded-map info card' ad-hoc entry (stale nodeId 1419:462091, from the original Overview wireframe before the designer componentized it). Property 1=Pickup / Property 1=Drop-off variants: white floating card affixed to a map pin — leading icon tile + name + truncated address. Exact geometry (re-read 2026-07-27): 250×56, VERTICAL, pad 8, --rounding-xl (12), fill --surface-neutral-bg-default, 1px --border-neutral-default, 3-layer drop shadow (--shadow-neutral-2); Content HORIZONTAL gap 8 = a 40×40 --surface-neutral-bg-tertiary tile at --rounding-lg holding a 20px outlined icon, then a VERTICAL gap-4 stack of Label/S/SemiBold title (--text-default-heading) + Label/S/Regular address (--text-default-sub-body), both ellipsis-truncated. Rendered in OrderDetailMap.tsx as a Leaflet divIcon anchored centred ~18px above its pin.",
       "firstSeen": "2026-07-20",
-      "reconciledAgainstRealComponent": "2026-07-21",
+      "reconciledAgainstRealComponent": "2026-07-27",
       "occurrences": 4
     }
   ]

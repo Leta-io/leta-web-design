@@ -8,7 +8,7 @@
 > **Companion design spec:** Table Column Layout Specification (owns column widths, floors, truncation, responsive behaviour)
 > **Audience:** implementation agent + engineers
 > **Status:** Ready for build — domain logic (Parts 1–11) and orders-surface interaction (Part 12); generic component behaviour in Doc 3
-> **Version:** 2.9
+> **Version:** 3.0 — adds §7.2.1 Route line styling (planned vs driven route semantics, colours, animation, non-overlap rule) and the expanded-map chrome components/banner matrix, reconciled against wireframes `1522:115768` on 2026-07-27.
 
 ---
 
@@ -273,15 +273,55 @@ The region above the accordion sections: a mini-map (left) and the **summary car
 | State | Map content |
 |---|---|
 | Pre-dispatch (Scheduled, Pending, Broadcasted) | Depot + drop-off pins only — no route exists until dispatch creates one |
-| Assigned / At Depot / In Transit / Arrived | Planned route line + **live driver marker** tracking his position against it |
-| Returning | Route + driver's live **location and orientation/heading** (is he actually heading back?); drop-off icon switches to **delivery failed** |
-| Delivered | LETA's suggested route **and the path the driver actually took**, in the secondary/default-border color variable |
-| Returned | Suggested route + the driver's trail **up to the point the return was triggered**; failed drop-off icon |
+| Assigned / At Depot / In Transit / Arrived | Planned route + **live driver marker** tracking his position against it |
+| Returning | Planned route + driver's live **location and orientation/heading** (is he actually heading back?); drop-off icon switches to **delivery failed** |
+| Delivered | Planned route **and the driven route** — the path the driver actually took |
+| Returned | Planned route **and the driven route**, where the driven line runs out and **loops back to the depot** so the dispatcher can see at which point the driver turned around; failed drop-off icon |
 | Cancelled | Route shown **only if** the order was dispatched before cancellation (cancelled pre-pickup); no route if never dispatched. (An actual-path overlay is structurally impossible here — cancellation ends at pickup; §11.1) |
 
-**Expanded map mode:** the expand control (map top-right) opens a fullscreen dimmed overlay — available in **every status**. Expanded mode adds an **info card affixed to the depot** and another **affixed to the drop-off**. For undispatched orders, a notification banner with a **Dispatch** CTA at its tail nudges the route into existence (copy corrected 2026-07-20 to the wireframe); once a driver holds the order the banner narrates the driver's progress instead ("Michael Kariuki is on the way to the depot." + View Activity):
+#### 7.2.1 Route line styling (locked 2026-07-27, wireframes `1522:115768`)
 
-> Dispatch now to generate a delivery route.
+Two route lines, with one meaning each. **This styling is identical in the small
+mini-map and the expanded map** — the small map is not a simplified variant.
+
+| Route | Meaning | Style |
+|---|---|---|
+| **Planned Route** | The route LETA generated. Renders **only once a driver has been assigned** — before that there is no route to plan against. | `--surface-secondary-bg` (#192037, dark navy), **dashed** 6/6, weight 3 |
+| **Driven Route** | The path the driver actually took. Renders once the attempt has concluded (Delivered, Returned). | `--icons-primary-default` (#ff3941, red), **solid**, weight 3 |
+
+- **Both lines carry the route micro-animation** — a 60%-opacity base plus a
+  100%-opacity comet segment sweeping depot→drop-off on a 2s linear loop, implying
+  direction. `prefers-reduced-motion` renders a static full-opacity line.
+- **The two lines must never overlap.** They are drawn with a deliberate
+  perpendicular "bow" that tapers to zero at both ends, so they read as two
+  distinct paths through the middle but **still terminate exactly on the two map
+  pins**. The bow is a *fraction of the trip length*, never a fixed distance — a
+  constant offset is invisible on a long trip and absurd on a short one.
+- **Returned** draws the driven route as an out-and-back loop (out-leg and
+  return-leg bowed to opposite sides) so the turnaround point is legible rather
+  than a line doubled back on itself.
+
+**Expanded map mode:** the expand control (map top-right) opens a fullscreen dimmed overlay — available in **every status**. Its chrome comes from three local Figma components:
+
+| Element | Component | Placement |
+|---|---|---|
+| **Map Card** | `1454:207949` (Pickup / Drop-off) | One affixed above each pin — 250×56, pad 8, radius 12, 40×40 icon tile, name + truncated address |
+| **Map Fixed Banner** | `1528:120794` (9 status variants) | **Top-centre**, 480×44 — dark `--surface-secondary-bg` bar, 18px leading icon, Body/M/Regular white text, vertical divider, trailing Plain link button |
+| **Map Legend** | `1528:119929` (1 Route / 2 Routes) | **Bottom-centre** pill — 32px sample line + Label/S/Medium caption per route. Hidden entirely when no route is drawn (pre-dispatch, cancelled-before-dispatch) |
+
+The design-system `MapZoomControl` sits **bottom-right** (MapView's default); nothing may overlap it. Banner copy + CTA per status:
+
+| Status | Banner | CTA |
+|---|---|---|
+| Scheduled / Pending / Broadcasted | Dispatch to generate a delivery route. | Dispatch |
+| Returned | Dispatch to generate a new delivery route. | Dispatch |
+| Assigned | {Driver} is heading to the depot. | Dispatch |
+| At Depot | {Driver} is at the depot. | View Activity |
+| In Transit | {Driver} is heading to the drop-off. | View Activity |
+| Arrived | {Driver} has arrived at the drop-off. | View Activity |
+| Returning | {Driver} is returning to the depot. | View Activity |
+| Delivered | {Driver} has delivered this order. | View Activity |
+| Cancelled | {Driver} cancelled this order. | View Activity |
 
 ### 7.3 Overview tab
 

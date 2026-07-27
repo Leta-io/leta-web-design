@@ -949,30 +949,15 @@ function DrawerBody({
           order={order}
           depotName={depotName}
           depotAddress={depotAddress}
-          banner={
-            order.driverId && driver
-              ? {
-                  text:
-                    status === 'returning'
-                      ? `${driver.name} is returning to the depot.`
-                      : status === 'in-transit' || status === 'arrived'
-                        ? `${driver.name} is on the way to ${order.customer.split(' ')[0]}.`
-                        : `${driver.name} is on the way to the depot.`,
-                  ctaLabel: 'View Activity',
-                  onCta: () => {
-                    setMapExpanded(false);
-                    setTab(1);
-                  },
-                }
-              : {
-                  text: 'Dispatch now to generate a delivery route.',
-                  ctaLabel: 'Dispatch',
-                  onCta: () => {
-                    setMapExpanded(false);
-                    actions.dispatch(order.id);
-                  },
-                }
-          }
+          driverName={driver?.name ?? null}
+          onDispatch={() => {
+            setMapExpanded(false);
+            actions.dispatch(order.id);
+          }}
+          onViewActivity={() => {
+            setMapExpanded(false);
+            setTab(1);
+          }}
           onClose={() => setMapExpanded(false)}
         />,
         document.body,
