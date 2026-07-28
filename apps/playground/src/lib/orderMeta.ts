@@ -1,5 +1,6 @@
 import { AVATAR_PHOTOS } from '@leta/components';
-import type { DepotOption, Order } from '../store/types.js';
+import type { DepotOption, Order, OrderStatus } from '../store/types.js';
+import { CANCEL_REASONS } from '../components/CancelOrderModal.js';
 
 /**
  * Shared deterministic order metadata — creators, provenance, SLA state, mock
@@ -76,6 +77,14 @@ export function scheduledOriginFor(o: Order): boolean {
 export function autoBroadcastFor(o: Order): boolean {
   return idHash(o.id) % 3 === 0;
 }
+/** Statuses eligible to show the Broadcast icon — any dispatched/finished status, never
+ *  while still unassigned (Scheduled/Pending/Broadcasted/Returned). */
+const BROADCAST_ELIGIBLE: OrderStatus[] = ['assigned', 'at-depot', 'in-transit', 'arrived', 'returning', 'delivered', 'cancelled'];
+/** Auto-broadcast icon (Order-ID cell + drawer header) — only shows once a driver has
+ *  been assigned, never on a still-unassigned order (§7.2). */
+export function showAutoBroadcastIcon(o: Order): boolean {
+  return autoBroadcastFor(o) && BROADCAST_ELIGIBLE.includes(o.status);
+}
 /** Today at the next full hour (reschedule anchor + fallbacks). */
 export function nextHourToday(): Date {
   const d = new Date();
@@ -132,4 +141,39 @@ export function depotForOrder(order: Order, depots: DepotOption[]): DepotOption 
   const owned = depots.find((d) => d.name === order.depot);
   if (owned) return owned;
   return depots.length === 1 ? depots[0] : depots[idHash(order.id) % depots.length];
+}
+
+// ── Reason-capture display formatting ────────────────────────────────────────
+// General-purpose formatter for any flow that captures selected-reason(s) +
+// free-text note (Cancel Order today; the same shape applies to other
+// reason-capture flows, e.g. a future Suspend Driver). Each selected reason
+// renders as its own period-terminated sentence, then the note as a final
+// sentence: "Customer requested it. Payment Issue. This was requested by the
+// customer."
+export function formatReasonCapture(reasons: string[], note?: string): string {
+  const parts = reasons.map((r) => r.replace(/\.$/, '') + '.');
+  if (note?.trim()) parts.push(note.trim().replace(/\.$/, '') + '.');
+  return parts.join(' ');
+}
+
+// Pre-seeded mock cancelled orders never ran through the live CancelOrderModal,
+// so they carry no cancelReasons/cancelNote — this fills in a deterministic,
+// varied reason+note per order (same idHash pattern as slaStateFor/creatorFor)
+// so browsing between them doesn't show identical "N/A" everywhere. 'Other' is
+// excluded from the mock pool — it requires a note in the real flow, and the
+// mock note here is independent/decorative, not gated the same way.
+const MOCK_CANCEL_NOTES = [
+  'Customer changed their mind after placing the order.',
+  'Recipient could not be reached after multiple attempts.',
+  'Requested a refund instead of redelivery.',
+  'Wrong address provided at checkout.',
+];
+export function mockCancellationFor(o: Order): { reasons: string[]; note: string } {
+  const h = idHash(o.id);
+  const pool = CANCEL_REASONS.filter((r) => r !== 'Other');
+  const reasons =
+    h % 2 === 0
+      ? [pool[h % pool.length]!]
+      : [pool[h % pool.length]!, pool[(h + 1) % pool.length]!];
+  return { reasons, note: MOCK_CANCEL_NOTES[h % MOCK_CANCEL_NOTES.length]! };
 }

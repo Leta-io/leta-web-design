@@ -1,16 +1,18 @@
 import type { IconName } from '@leta/icons';
 import type { ClientConfig, DepotOption, Driver, Order, OrderStatus } from '../../store/types.js';
 import {
-  autoBroadcastFor,
   creatorFor,
   depotForOrder,
   durationSecondsFor,
   formatDateTime,
+  formatReasonCapture,
   idHash,
+  mockCancellationFor,
   MONTHS,
   scheduledDateFor,
   scheduledLabelFor,
   scheduledOriginFor,
+  showAutoBroadcastIcon,
   slaStateFor,
   type Creator,
   type SlaState,
@@ -139,6 +141,8 @@ export interface OrderDetailModel {
   dispatchedLabel: string;
   dispatchedByLabel: string;
   deliveredLabel: string;
+  /** More Information — cancelled orders only ("Reason. Reason. Note." sentences). */
+  cancellationReason: string;
   /** POD section (Delivered) */
   pod: { receivedBy: string; phone: string; idNumber: string; paymentRef: string };
   proofOfPickupFile: ProofFile;
@@ -266,6 +270,14 @@ export function buildOrderDetail(
   const dispatchTime = new Date(scheduled.getTime() - 30 * 60 * 1000);
   const humanCreator = creator.source === 'human';
 
+  // Real captured data (from a live CancelOrderModal confirm) wins; pre-seeded
+  // mock cancelled orders fall back to a deterministic mock so they don't all
+  // read "N/A".
+  const cancellation = order.cancelReasons?.length
+    ? { reasons: order.cancelReasons, note: order.cancelNote ?? '' }
+    : mockCancellationFor(order);
+  const cancellationReason = formatReasonCapture(cancellation.reasons, cancellation.note);
+
   const first = (order.customer.split(' ')[0] ?? 'user').toLowerCase();
 
   const proofOfPickupFile: ProofFile = {
@@ -293,7 +305,7 @@ export function buildOrderDetail(
     // auto-broadcast client a scheduled order skips Pending entirely (§7.2), so
     // its Pending state (order-wait-time, Ov1) is never scheduled-origin.
     scheduledOrigin: schedOrigin && !(status === 'pending' && config.autoBroadcast),
-    showBroadcast: autoBroadcastFor(order),
+    showBroadcast: showAutoBroadcastIcon(order),
     scheduledDate: scheduled,
     scheduledTooltip: scheduledLabelFor(order),
     sla,
@@ -327,6 +339,7 @@ export function buildOrderDetail(
     dispatchedLabel: dispatched ? formatDateTime(dispatchTime) : 'N/A',
     dispatchedByLabel: dispatched ? 'Jude Bello' : 'N/A',
     deliveredLabel: status === 'delivered' || status === 'cancelled' ? formatDateTime(terminal) : 'N/A',
+    cancellationReason,
     pod: {
       receivedBy: RECEIVERS[h % RECEIVERS.length]!,
       phone: order.phone.replace(/\s/g, ''),

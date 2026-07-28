@@ -755,7 +755,7 @@ export function AddOrderDrawer({ open, config, onClose, onSubmit, mode = 'create
                     <Select
                       showLabel={false}
                       showHelper={false}
-                      placeholder="Select product"
+                      placeholder="Select item"
                       value={products.find((p) => p.id === row.productId)?.name ?? ''}
                       onSelectClick={() => openPicker({ kind: 'product', anchor: anchor(), rowKey: row.key })}
                       readOnly
@@ -926,7 +926,7 @@ export function AddOrderDrawer({ open, config, onClose, onSubmit, mode = 'create
         const activeId = items.find((r) => r.key === picker.rowKey)?.productId;
         return (
           <Popover anchorRect={picker.anchor} onClose={() => setPicker(null)} placement="bottom-start">
-            <ComboSearchPanel width={Math.max(320, picker.anchor.width)} query={pickerQuery} onQuery={setPickerQuery} placeholder="Search products">
+            <ComboSearchPanel width={Math.max(320, picker.anchor.width)} query={pickerQuery} onQuery={setPickerQuery} placeholder="Search items">
               {rows.map((p) => (
                 <DesktopMenuOptions
                   key={p.id}
@@ -988,11 +988,11 @@ export function AddOrderDrawer({ open, config, onClose, onSubmit, mode = 'create
               message={isEdit
                 ? 'You have unsaved changes. Are you sure you want to discard them?'
                 : 'The order details you’ve entered won’t be saved. Are you sure you want to discard them?'}
-              cancelLabel={isEdit ? 'Keep Editing Order' : 'Keep Editing Order'}
-              confirmLabel={isEdit ? 'Discard Changes' : 'Discard Order'}
-              onCancel={() => setConfirmExit(false)}
+              cancelLabel={isEdit ? 'Discard Changes' : 'Discard Order'}
+              confirmLabel="Keep Editing Order"
+              onCancel={() => { setConfirmExit(false); beginClose(); }}
               onClose={() => setConfirmExit(false)}
-              onConfirm={() => { setConfirmExit(false); beginClose(); }}
+              onConfirm={() => setConfirmExit(false)}
             />
           </div>
         </>

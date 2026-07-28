@@ -46,7 +46,7 @@ import {
   scheduledDateFor,
   scheduledLabelFor,
   scheduledOriginFor,
-  autoBroadcastFor,
+  showAutoBroadcastIcon,
   slaStateFor,
   type SlaState,
 } from '../lib/orderMeta.js';
@@ -96,6 +96,39 @@ const EXTRA_COLUMN_OPTIONS: { key: ExtraColumnKey; label: string }[] = [
 
 function canDispatch(o: Order): boolean {
   return GROUP_STATUSES.unassigned.includes(o.status);
+}
+
+// ── Order action success/toast decision tree ────────────────────────────────
+// Single source of truth: does a status still belong to the current
+// filterTab/subStatus view? Lifted verbatim from `filtered`'s first two lines
+// (the same "is this in view" check, already used twice in this file) so
+// action handlers never re-derive status-group membership their own way.
+function matchesCurrentView(status: OrderStatus, filterTab: FilterTab, subStatus: OrderStatus | null): boolean {
+  if (filterTab !== 'all' && !GROUP_STATUSES[filterTab].includes(status)) return false;
+  if (subStatus && status !== subStatus) return false;
+  return true;
+}
+
+// Singular toast copy never leads with a count ("Order cancelled", not "1
+// order cancelled"); plural keeps the count ("3 orders cancelled").
+function pluralOrderCopy(n: number, verb: string, verbPast: string): { toastTitle: string; toastSubtitle: string } {
+  return n === 1
+    ? { toastTitle: `Order ${verb}`, toastSubtitle: `Your order has been ${verbPast}.` }
+    : { toastTitle: `${n} orders ${verb}`, toastSubtitle: `Your orders have been ${verbPast}.` };
+}
+
+/** The filterTab/subStatus view a given status lives in — for a "View order(s)"
+ *  CTA to navigate the dispatcher to where the acted-upon order(s) landed. */
+function viewFor(status: OrderStatus): { filterTab: FilterTab; subStatus: OrderStatus } {
+  const tab = (Object.keys(GROUP_STATUSES) as Exclude<FilterTab, 'all'>[]).find((t) =>
+    GROUP_STATUSES[t].includes(status),
+  )!;
+  return { filterTab: tab, subStatus: status };
+}
+
+/** Mock trip id for Add to Trip — same `TRP-10x` pattern mockData.ts seeds. */
+function mockTripId(h: number): string {
+  return `TRP-${101 + (h % 8)}`;
 }
 
 // The Reschedule modal's opening state (OM §11.2 + 2026-07-17 changelog):
@@ -265,9 +298,11 @@ function ensureBulkbarStyles(): void {
 export function OrdersPage(): React.ReactElement {
   ensureBulkbarStyles();
   const orders = useStore((s) => s.orders);
+  const drivers = useStore((s) => s.drivers);
   const getDriver = useStore((s) => s.getDriver);
   const updateOrderStatus = useStore((s) => s.updateOrderStatus);
   const updateOrder = useStore((s) => s.updateOrder);
+  const assignOrder = useStore((s) => s.assignOrder);
   const cancelOrder = useStore((s) => s.cancelOrder);
   const pushToast = useStore((s) => s.pushToast);
   const addOrder = useStore((s) => s.addOrder);
@@ -393,9 +428,23 @@ export function OrdersPage(): React.ReactElement {
   // Order Detail drawer (OM §7 / wireframes 320:99590) — opened by clicking a
   // table row (§3.1) or the "Order created" toast's View Order CTA.
   const [viewOrderId, setViewOrderId] = React.useState<string | null>(null);
+  // Externally-driven drawer skeleton (§9) — set briefly whenever an action's
+  // outcome keeps the View Order drawer open, so the refreshed data reads as
+  // "just fetched" rather than silently swapping in place.
+  const [drawerLoading, setDrawerLoading] = React.useState(false);
+  const drawerLoadingTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashDrawerLoading = (duration = 450) => {
+    if (drawerLoadingTimer.current) clearTimeout(drawerLoadingTimer.current);
+    setDrawerLoading(true);
+    drawerLoadingTimer.current = setTimeout(() => {
+      drawerLoadingTimer.current = null;
+      setDrawerLoading(false);
+    }, duration);
+  };
   React.useEffect(() => () => {
     if (firstLoadTimer.current) clearTimeout(firstLoadTimer.current);
     if (tableRefreshTimer.current) clearTimeout(tableRefreshTimer.current);
+    if (drawerLoadingTimer.current) clearTimeout(drawerLoadingTimer.current);
   }, []);
   const [overlay, setOverlay] = React.useState<OverlayState | null>(null);
 
@@ -584,17 +633,86 @@ export function OrdersPage(): React.ReactElement {
 
 
   // ── Actions ────────────────────────────────────────────────────────────────
+  // The shared decision tree (single source of truth for every order action):
+  // did the order(s) leave the user's current view?
+  //   YES → close the drawer (if it was showing one of these orders), refresh
+  //         the table, toast WITH a "View order(s)"-style CTA.
+  //   NO  → keep the drawer open, quietly re-flow the table in the background
+  //         (no visible flash — nothing changed the visible rows), toast
+  //         WITHOUT a CTA. If the drawer was open, flash its own skeleton so
+  //         the refreshed data reads as "just fetched".
+  // Every bulk action here applies ONE uniform target status to the whole
+  // selection, so this is a single yes/no check, never a per-order split.
+  interface ActionOutcomeCta {
+    kind: 'view-order' | 'view-orders' | 'view-trip';
+    label: string;
+    targetOrderId?: string;
+    targetFilterTab?: FilterTab;
+    targetSubStatus?: OrderStatus | null;
+  }
+  const resolveActionOutcome = (opts: {
+    orderIds: string[];
+    newStatus: OrderStatus;
+    toastType?: 'success' | 'warning' | 'error';
+    toastTitle: string;
+    toastSubtitle: string;
+    cta?: ActionOutcomeCta;
+    /** Cancel Order's documented exception — never shows a CTA, regardless of view. */
+    suppressCta?: boolean;
+  }) => {
+    const leftView = !matchesCurrentView(opts.newStatus, filterTab, subStatus);
+    const drawerWasOpen = viewOrderId != null && opts.orderIds.includes(viewOrderId);
+    if (leftView) {
+      if (drawerWasOpen) setViewOrderId(null);
+      flashTableLoading();
+    } else if (drawerWasOpen) {
+      flashDrawerLoading();
+    }
+    const cta = opts.cta;
+    pushToast({
+      type: opts.toastType ?? 'success',
+      title: opts.toastTitle,
+      subtitle: opts.toastSubtitle,
+      cta: !opts.suppressCta && leftView && cta
+        ? {
+            label: cta.label,
+            onClick: () => {
+              if (cta.targetFilterTab !== undefined) {
+                setFilterTab(cta.targetFilterTab);
+                setSubStatus(cta.targetSubStatus ?? null);
+              }
+              if (cta.kind !== 'view-orders' && cta.targetOrderId) setViewOrderId(cta.targetOrderId);
+              setPage(1);
+              flashTableLoading();
+            },
+          }
+        : undefined,
+    });
+  };
+
   const dispatchOrder = (orderId: string) => {
     updateOrderStatus(orderId, 'broadcasted');
-    pushToast({ type: 'success', title: 'Order dispatched', subtitle: `${orderId} is now broadcasted to nearby drivers.` });
+    resolveActionOutcome({
+      orderIds: [orderId],
+      newStatus: 'broadcasted',
+      toastTitle: 'Order dispatched',
+      toastSubtitle: `${orderId} is now broadcasted to nearby drivers.`,
+      cta: { kind: 'view-order', label: 'View Order', targetOrderId: orderId, ...viewFor('broadcasted') },
+    });
   };
 
   const selectedOrders = (): Order[] => orders.filter((o) => selectedIds.has(o.id));
 
   const bulkDispatch = () => {
     const ids = selectedOrders().filter(canDispatch).map((o) => o.id);
+    if (ids.length === 0) return;
     ids.forEach((id) => updateOrderStatus(id, 'broadcasted'));
-    pushToast({ type: 'success', title: `${ids.length} order(s) dispatched`, subtitle: 'Broadcasted to nearby drivers.' });
+    resolveActionOutcome({
+      orderIds: ids,
+      newStatus: 'broadcasted',
+      ...pluralOrderCopy(ids.length, 'dispatched', 'dispatched'),
+      cta: { kind: 'view-orders', label: 'View Orders', ...viewFor('broadcasted') },
+    });
     clearSelection();
   };
 
@@ -602,23 +720,24 @@ export function OrdersPage(): React.ReactElement {
   // rules this "required, no exceptions". Both entry points open the Cancel
   // Order modal (Figma `1382:104119`): reason checkboxes + optional note,
   // destructive confirm disabled until ≥1 reason ("Other" additionally
-  // requires the note, OM §11.1). On confirm, a SUCCESS toast reports the
-  // outcome count-led ("1 order cancelled" / "10 orders cancelled") — no CTA,
-  // per the wireframe (ruled 2026-07-16).
+  // requires the note, OM §11.1). Cancel is the one documented exception to
+  // the decision tree's generic CTA rule — it NEVER shows a "View order" CTA,
+  // even when the order stays in view (the dispatcher doesn't want to revisit
+  // an order they just cancelled).
   const [cancelConfirm, setCancelConfirm] = React.useState<string[] | null>(null);
   const requestCancel = (ids: string[]) => setCancelConfirm(ids);
   const confirmCancel = (reasons: string[], note: string) => {
     const ids = cancelConfirm ?? [];
     ids.forEach((id) => cancelOrder(id, reasons, note));
     setCancelConfirm(null);
-    const n = ids.length;
-    if (n === 0) return;
-    pushToast({
-      type: 'success',
-      title: `${n} order${n === 1 ? '' : 's'} cancelled`,
-      subtitle: `Your order${n === 1 ? ' has' : 's have'} been cancelled.`,
+    if (ids.length === 0) return;
+    resolveActionOutcome({
+      orderIds: ids,
+      newStatus: 'cancelled',
+      suppressCta: true,
+      ...pluralOrderCopy(ids.length, 'cancelled', 'cancelled'),
     });
-    if (n > 1) clearSelection();
+    if (ids.length > 1) clearSelection();
   };
   const bulkCancel = () => requestCancel(selectedOrders().map((o) => o.id));
   // Return Order (§11.3) isn't built yet — stubs a toast, mirroring the row-level
@@ -643,15 +762,22 @@ export function OrdersPage(): React.ReactElement {
     const ids = updateStatusFor ?? [];
     ids.forEach((id) => updateOrderStatus(id, target));
     setUpdateStatusFor(null);
-    const n = ids.length;
-    if (n === 0) return;
+    if (ids.length === 0) return;
     // Toast subtitle names the target status (wireframe 1408:237553 / 1239:108227).
-    pushToast({
-      type: 'success',
-      title: `${n} order${n === 1 ? '' : 's'} updated`,
-      subtitle: `Your order${n === 1 ? ' has' : 's have'} been marked as ${target}.`,
+    // Single → "View order" reopens that exact order's drawer; multiple →
+    // "View orders" only navigates to the destination table (never reopens a
+    // specific drawer), per spec.
+    resolveActionOutcome({
+      orderIds: ids,
+      newStatus: target,
+      toastTitle: pluralOrderCopy(ids.length, 'updated', '').toastTitle,
+      toastSubtitle: `Your order${ids.length === 1 ? ' has' : 's have'} been marked as ${target}.`,
+      cta:
+        ids.length === 1
+          ? { kind: 'view-order', label: 'View Order', targetOrderId: ids[0], ...viewFor(target) }
+          : { kind: 'view-orders', label: 'View Orders', ...viewFor(target) },
     });
-    if (n > 1) clearSelection();
+    if (ids.length > 1) clearSelection();
   };
   const confirmReschedule = () => {
     // Reschedule → the order lands in Scheduled (OM §11.2). The picked date is
@@ -660,10 +786,88 @@ export function OrdersPage(): React.ReactElement {
     const ids = rescheduleFor ?? [];
     ids.forEach((id) => updateOrderStatus(id, 'scheduled'));
     setRescheduleFor(null);
-    const n = ids.length;
-    if (n === 0) return;
-    pushToast({ type: 'success', title: `${n} order${n === 1 ? '' : 's'} rescheduled`, subtitle: `Your order${n === 1 ? ' has' : 's have'} been rescheduled.` });
-    if (n > 1) clearSelection();
+    if (ids.length === 0) return;
+    resolveActionOutcome({
+      orderIds: ids,
+      newStatus: 'scheduled',
+      ...pluralOrderCopy(ids.length, 'rescheduled', 'rescheduled'),
+      cta:
+        ids.length === 1
+          ? { kind: 'view-order', label: 'View Order', targetOrderId: ids[0], ...viewFor('scheduled') }
+          : { kind: 'view-orders', label: 'View Orders', ...viewFor('scheduled') },
+    });
+    if (ids.length > 1) clearSelection();
+  };
+
+  // Add to Trip — assigns a mock available driver + trip id (reuses the store's
+  // existing `assignOrder`, which already transitions the order to 'assigned').
+  // Change Driver — reassigns to a different mock driver WITHOUT touching
+  // status (deliberately NOT `assignOrder`, which force-resets status to
+  // 'assigned' even mid-trip — out of scope to fix store-wide here).
+  const addToTrip = (orderId: string) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    const driver = drivers.find((d) => d.status === 'available') ?? drivers[0];
+    if (!driver) return;
+    const tripId = mockTripId(idHash(orderId));
+    assignOrder(orderId, driver.id);
+    updateOrder(orderId, { tripId });
+    resolveActionOutcome({
+      orderIds: [orderId],
+      newStatus: 'assigned',
+      toastTitle: `Order added to ${tripId}`,
+      toastSubtitle: 'Your order has been moved to a new trip.',
+      cta: { kind: 'view-trip', label: 'View Trip', targetOrderId: orderId, ...viewFor('assigned') },
+    });
+  };
+  const bulkAddToTrip = () => {
+    const targets = selectedOrders().filter(canDispatch);
+    if (targets.length === 0) return;
+    const driver = drivers.find((d) => d.status === 'available') ?? drivers[0];
+    if (!driver) return;
+    const tripId = mockTripId(idHash(targets[0]!.id));
+    targets.forEach((o) => {
+      assignOrder(o.id, driver.id);
+      updateOrder(o.id, { tripId });
+    });
+    resolveActionOutcome({
+      orderIds: targets.map((o) => o.id),
+      newStatus: 'assigned',
+      toastTitle: `${targets.length} orders added to ${tripId}`,
+      toastSubtitle: 'Your orders have been moved to a new trip.',
+      cta: { kind: 'view-trip', label: 'View Trip', ...viewFor('assigned') },
+    });
+    clearSelection();
+  };
+  const changeDriver = (orderId: string) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    const candidate = drivers.find((d) => d.id !== order.driverId);
+    if (!candidate) return;
+    updateOrder(orderId, { driverId: candidate.id });
+    // Swapping only the driver never changes status — this always stays in
+    // the current view (copy explicitly marked "not designed yet" by the user).
+    resolveActionOutcome({
+      orderIds: [orderId],
+      newStatus: order.status,
+      toastTitle: 'Driver updated',
+      toastSubtitle: 'Your driver has been updated.',
+    });
+  };
+  const bulkChangeDriver = () => {
+    const targets = selectedOrders();
+    if (targets.length === 0) return;
+    targets.forEach((o) => {
+      const candidate = drivers.find((d) => d.id !== o.driverId);
+      if (candidate) updateOrder(o.id, { driverId: candidate.id });
+    });
+    resolveActionOutcome({
+      orderIds: targets.map((o) => o.id),
+      newStatus: targets[0]!.status,
+      toastTitle: targets.length === 1 ? 'Driver updated' : `${targets.length} drivers updated`,
+      toastSubtitle: `Your driver${targets.length === 1 ? ' has' : 's have'} been updated.`,
+    });
+    clearSelection();
   };
 
   // Edit Order (OM §8, Figma 350:38360) — reuses the Add Order drawer in edit
@@ -671,6 +875,10 @@ export function OrdersPage(): React.ReactElement {
   // beyond are frozen (the recourse is a disruption action, not an edit).
   const EDITABLE_STATUSES: OrderStatus[] = ['scheduled', 'pending', 'broadcasted', 'assigned', 'at-depot'];
   const [editOrderId, setEditOrderId] = React.useState<string | null>(null);
+  // Distinguishes "edited from inside the open View drawer" (its footer → Edit
+  // Order) from "edited via the table row's overflow menu" (View drawer never
+  // opened) — the two follow different branches of the decision tree.
+  const editedFromDrawerRef = React.useRef(false);
   const editingOrder = editOrderId ? orders.find((o) => o.id === editOrderId) ?? null : null;
   const requestEdit = (orderId: string) => {
     const o = orders.find((x) => x.id === orderId);
@@ -679,6 +887,7 @@ export function OrdersPage(): React.ReactElement {
       pushToast({ type: 'warning', title: 'Editing is blocked', subtitle: 'This order has left the depot — use Return instead.' });
       return;
     }
+    editedFromDrawerRef.current = viewOrderId === orderId;
     setEditOrderId(orderId);
   };
   const handleOrderEdited = (input: NewOrderInput) => {
@@ -694,12 +903,26 @@ export function OrdersPage(): React.ReactElement {
       items: input.items,
     });
     const notify = status === 'assigned' || status === 'at-depot';
+    const orderId = editingOrder.id;
+    const fromDrawer = editedFromDrawerRef.current;
     setEditOrderId(null);
-    pushToast({
-      type: 'success',
-      title: 'Order updated',
-      subtitle: notify ? 'Your changes are saved and the driver has been notified.' : 'Your changes have been saved.',
-    });
+    const toastSubtitle = notify ? 'Your changes are saved and the driver has been notified.' : 'Your changes have been saved.';
+    if (fromDrawer) {
+      // Edits alone never change status — the View drawer (already open) just
+      // stays open and refreshes; no CTA, per spec.
+      flashDrawerLoading();
+      pushToast({ type: 'success', title: 'Order updated', subtitle: toastSubtitle });
+    } else {
+      // Edited straight from the table's row menu — the View drawer was never
+      // open, so refresh the table and offer a CTA back into it.
+      flashTableLoading();
+      pushToast({
+        type: 'success',
+        title: 'Order updated',
+        subtitle: toastSubtitle,
+        cta: { label: 'View Order', onClick: () => { setViewOrderId(orderId); setPage(1); } },
+      });
+    }
   };
 
   const noop = (title = 'Coming soon') =>
@@ -867,7 +1090,7 @@ export function OrdersPage(): React.ReactElement {
         onCopyOrderId: () => navigator.clipboard.writeText(o.id),
         showScheduledIcon: scheduledOrigin,
         scheduledTooltip: scheduledOrigin ? scheduledLabelFor(o) : undefined,
-        showBroadcastIcon: autoBroadcastFor(o),
+        showBroadcastIcon: showAutoBroadcastIcon(o),
       },
       'Batch ID': { type: 'sample', text: o.batchId ?? '—' }, // Broadcasted view only
       // Trip cell — a Plain button ("TRP-103 ↗", trailing Open icon, no
@@ -1136,9 +1359,9 @@ export function OrdersPage(): React.ReactElement {
                       case 'dispatch':
                         return <Button key={a} variant="ghost" size="medium" iconLeft="Proceed" onClick={bulkDispatch}>Dispatch</Button>;
                       case 'addToTrip':
-                        return <Button key={a} variant="ghost" size="medium" iconLeft="Add" iconOutlined onClick={() => noop('Add To Trip')}>Add To Trip</Button>;
+                        return <Button key={a} variant="ghost" size="medium" iconLeft="Add" iconOutlined onClick={bulkAddToTrip}>Add To Trip</Button>;
                       case 'changeDriver':
-                        return <Button key={a} variant="ghost" size="medium" iconLeft="Swap" iconOutlined onClick={() => noop('Change Driver')}>Change Driver</Button>;
+                        return <Button key={a} variant="ghost" size="medium" iconLeft="Swap" iconOutlined onClick={bulkChangeDriver}>Change Driver</Button>;
                       case 'updateStatus':
                         return <Button key={a} variant="ghost" size="medium" iconLeft="Update" iconOutlined onClick={() => requestUpdateStatus(selectedOrders().map((o) => o.id))}>Update Status</Button>;
                       case 'cancel':
@@ -1195,6 +1418,8 @@ export function OrdersPage(): React.ReactElement {
           onRequestUpdateStatus={requestUpdateStatus}
           onRequestReschedule={requestReschedule}
           onRequestEdit={requestEdit}
+          onAddToTrip={addToTrip}
+          onChangeDriver={changeDriver}
         />
       )}
 
@@ -1204,12 +1429,15 @@ export function OrdersPage(): React.ReactElement {
       <OrderDetailDrawer
         orderId={viewOrderId}
         onClose={() => setViewOrderId(null)}
+        loading={drawerLoading}
         actions={{
           dispatch: dispatchOrder,
           requestCancel,
           requestUpdateStatus,
           requestReschedule,
           requestEdit,
+          addToTrip,
+          changeDriver,
           stub: (title) => noop(title),
         }}
       />
@@ -1309,9 +1537,12 @@ interface OverlayHostProps {
   onRequestReschedule: (ids: string[]) => void;
   /** Open the Edit Order drawer for the given order (OM §8). */
   onRequestEdit: (orderId: string) => void;
+  /** Add To Trip / Change Driver for a single order (row ⋯ menu). */
+  onAddToTrip: (orderId: string) => void;
+  onChangeDriver: (orderId: string) => void;
 }
 
-function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, onPickStatus, countByStatus, selectedOrderList, deselect, onCreatedLabel, extraCols, onToggleColumn, filterGroups, appliedFilters, filterPreviewCount, onFilterSelectionChange, onFilterApply, onFilterReset, onImport, onSortChange, rowsPerPage, onRowsPerPage, onRequestUpdateStatus, onRequestReschedule, onRequestEdit }: OverlayHostProps): React.ReactElement {
+function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, onPickStatus, countByStatus, selectedOrderList, deselect, onCreatedLabel, extraCols, onToggleColumn, filterGroups, appliedFilters, filterPreviewCount, onFilterSelectionChange, onFilterApply, onFilterReset, onImport, onSortChange, rowsPerPage, onRowsPerPage, onRequestUpdateStatus, onRequestReschedule, onRequestEdit, onAddToTrip, onChangeDriver }: OverlayHostProps): React.ReactElement {
   const { kind, anchor, orderId, orderStatus, group } = overlay;
 
   if (kind === 'rowsPerPage') {
@@ -1499,6 +1730,8 @@ function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, 
                     if (a.label === 'Update Status') onRequestUpdateStatus([orderId]);
                     else if (a.label === 'Reschedule Order') onRequestReschedule([orderId]);
                     else if (a.label === 'Edit Order') onRequestEdit(orderId);
+                    else if (a.label === 'Add To Trip') onAddToTrip(orderId);
+                    else if (a.label === 'Change Driver') onChangeDriver(orderId);
                     else pushToast({ type: 'success', title: a.label, subtitle: 'This action is coming soon.' });
                   }}
                 />

@@ -147,7 +147,10 @@ function ToastRegion(): React.ReactElement {
         position: 'fixed',
         top: 24,
         right: 24,
-        zIndex: 1000,
+        // Toasts are global feedback and must render above every drawer/overlay
+        // in the app — the View Order drawer's panel is 1500/1501, its proof
+        // viewers 1700/1701, so this needs to clear all of them.
+        zIndex: 1800,
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--spacing-12px)',

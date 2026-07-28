@@ -21,6 +21,7 @@ import {
   PageTabsControl,
   Pagination,
   SIGNATURE_IMAGE,
+  Skeleton,
 } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
 import { useStore } from '../../store/useStore.js';
@@ -148,6 +149,55 @@ function Section({
   );
 }
 
+/** A skeleton stand-in for one `Section` card — same chrome (white, radius xl,
+ *  1px border, pad 20), a title-width bar in place of the real heading, and a
+ *  few field-shaped bars in place of real content. */
+function SectionSkeleton({ rows = 2 }: { rows?: number }): React.ReactElement {
+  return (
+    <div
+      style={{
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--spacing-20px)',
+        width: '100%',
+        backgroundColor: 'var(--surface-neutral-bg-default)',
+        borderRadius: 'var(--rounding-xl)',
+        border: 'var(--stroke-xs) solid var(--border-neutral-default)',
+        padding: 'var(--padding-20px)',
+      }}
+    >
+      <Skeleton width={140} height={20} />
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} style={{ display: 'flex', gap: 'var(--spacing-16px)', width: '100%' }}>
+          <Skeleton width="50%" height={36} />
+          <Skeleton width="50%" height={36} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Overview-tab skeleton (§9) — mirrors `SkeletonTableRows`' real-header/
+ *  skeleton-body split: the drawer's own header/footer render normally, only
+ *  this body region stands in while `loading` is true. Shown briefly on drawer
+ *  open and whenever an action keeps the drawer open (re-fetch simulation). */
+function DrawerSkeleton(): React.ReactElement {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Loading order details"
+      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-20px)', padding: 'var(--padding-24px) var(--padding-16px) var(--padding-40px)' }}
+    >
+      <Skeleton width="100%" height={168} borderRadius="var(--rounding-xl)" />
+      <SectionSkeleton rows={1} />
+      <SectionSkeleton rows={2} />
+      <SectionSkeleton rows={3} />
+    </div>
+  );
+}
+
 /** One label + icon+value field (the wireframes' vertical-list-row CP). */
 function Field({ label, value, icon }: { label: string; value: string; icon?: IconName }): React.ReactElement {
   return (
@@ -255,7 +305,9 @@ export interface OrderDetailActions {
   requestUpdateStatus: (ids: string[]) => void;
   requestReschedule: (ids: string[]) => void;
   requestEdit: (id: string) => void;
-  /** Unbuilt actions (Add To Trip / Change Driver / Return Order / Add Comment / Tracking Link). */
+  addToTrip: (id: string) => void;
+  changeDriver: (id: string) => void;
+  /** Unbuilt actions (Return Order / Add Comment / Recipient Map). */
   stub: (title: string) => void;
 }
 
@@ -263,11 +315,17 @@ export function OrderDetailDrawer({
   orderId,
   onClose,
   actions,
+  loading = false,
 }: {
   /** The order to show; null renders nothing. */
   orderId: string | null;
   onClose: () => void;
   actions: OrderDetailActions;
+  /** Externally-driven skeleton (§9) — set briefly by the host after an action
+   *  that keeps the drawer open, so the refreshed data reads as "just fetched"
+   *  rather than silently swapping in place. The drawer also shows its own
+   *  brief skeleton on first open for a given order, independent of this. */
+  loading?: boolean;
 }): React.ReactElement | null {
   const orders = useStore((s) => s.orders);
   const getDriver = useStore((s) => s.getDriver);
@@ -312,6 +370,7 @@ export function OrderDetailDrawer({
       setTab={setTab}
       onClose={close}
       actions={actions}
+      loading={loading}
     />
   );
 }
@@ -327,6 +386,7 @@ function DrawerBody({
   setTab,
   onClose,
   actions,
+  loading,
 }: {
   order: Order;
   driverId: string | null;
@@ -338,7 +398,17 @@ function DrawerBody({
   setTab: (i: number) => void;
   onClose: () => void;
   actions: OrderDetailActions;
+  loading: boolean;
 }): React.ReactElement {
+  // Brief skeleton on first open for this order (remounts via the `key={order.id}`
+  // above, so this resets per order) — independent of the externally-driven
+  // `loading` prop (action-triggered refresh while staying open).
+  const [justOpened, setJustOpened] = React.useState(true);
+  React.useEffect(() => {
+    const t = setTimeout(() => setJustOpened(false), 450);
+    return () => clearTimeout(t);
+  }, []);
+  const showSkeleton = justOpened || loading;
   const driver = driverId ? (getDriver(driverId) ?? null) : null;
   const model = React.useMemo(
     () => buildOrderDetail(order, driver, config, { photo: DOORSTEP_DELIVERY_IMAGE, signature: SIGNATURE_IMAGE }),
@@ -406,8 +476,8 @@ function DrawerBody({
     switch (key) {
       case 'cancel': return actions.requestCancel([order.id]);
       case 'return': return actions.stub('Return Order');
-      case 'addToTrip': return actions.stub('Add To Trip');
-      case 'changeDriver': return actions.stub('Change Driver');
+      case 'addToTrip': return actions.addToTrip(order.id);
+      case 'changeDriver': return actions.changeDriver(order.id);
       case 'editOrder': return actions.requestEdit(order.id);
       case 'dispatch': return actions.dispatch(order.id);
       case 'updateStatus': return actions.requestUpdateStatus([order.id]);
@@ -592,7 +662,7 @@ function DrawerBody({
                 ) : (
                   <div style={{ display: 'flex', gap: 'var(--spacing-8px)' }}>
                     <HoverTip label="Change driver">
-                      <Button variant="secondary" size="medium" iconOnly="Swap" aria-label="Change driver" onClick={() => actions.stub('Change Driver')} />
+                      <Button variant="secondary" size="medium" iconOnly="Swap" aria-label="Change driver" onClick={() => actions.changeDriver(order.id)} />
                     </HoverTip>
                     <HoverTip label="Call driver">
                       <Button variant="secondary" size="medium" iconOnly="Phone" iconOutlined aria-label="Call driver" onClick={() => actions.stub('Call Driver')} />
@@ -788,6 +858,9 @@ function DrawerBody({
             <Field key="db" label="Dispatched By" value={model.dispatchedByLabel} icon="User" />,
             <Field key="dl" label="Completed" value={model.deliveredLabel} icon="Calendar" />,
             <Field key="w" label="Weight" value="N/A" icon="Weight" />,
+            ...(status === 'cancelled'
+              ? [<Field key="cr" label="Cancellation reason" value={model.cancellationReason} icon="Note" />]
+              : []),
           ]}
         />
       </Section>
@@ -863,10 +936,10 @@ function DrawerBody({
                     copiedLabel="Copied"
                     onClick={() => void navigator.clipboard.writeText(order.id)}
                   >
-                    Order ID
+                    Copy ID
                   </Button>
-                  <Button variant="secondary" size="small" iconLeft="Link" onClick={() => actions.stub('Tracking Link')}>
-                    Tracking Link
+                  <Button variant="secondary" size="small" iconLeft="Open" onClick={() => actions.stub('Recipient Map')}>
+                    Recipient Map
                   </Button>
                 </div>
               }
@@ -923,7 +996,7 @@ function DrawerBody({
           }
           bodyStyle={{ backgroundColor: 'var(--surface-neutral-bg-default)' }}
         >
-          {tab === 0 ? overviewBody : tab === 1 ? placeholderBody('Activity') : placeholderBody('Dispatch Logs')}
+          {tab === 0 && showSkeleton ? <DrawerSkeleton /> : tab === 0 ? overviewBody : tab === 1 ? placeholderBody('Activity') : placeholderBody('Dispatch Logs')}
         </ModalShell>
       </div>
 
