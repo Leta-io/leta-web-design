@@ -28,6 +28,8 @@ import { useStore } from '../../store/useStore.js';
 import type { ClientConfig, Driver, Order, OrderStatus } from '../../store/types.js';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
 import { Popover, MenuPanel, MenuDivider } from '../Popover.js';
+import { buildActivityTrail } from './activityModel.js';
+import { ActivityList } from './ActivityTab.js';
 import { buildOrderDetail, fmtClock, slaHeadline, type OrderDetailModel, type ProofFile } from './detailModel.js';
 import { ExpandedMapOverlay, OrderMiniMap } from './OrderDetailMap.js';
 
@@ -414,6 +416,7 @@ function DrawerBody({
     () => buildOrderDetail(order, driver, config, { photo: DOORSTEP_DELIVERY_IMAGE, signature: SIGNATURE_IMAGE }),
     [order, driver, config],
   );
+  const activityItems = React.useMemo(() => buildActivityTrail(model, config), [model, config]);
   const status = order.status;
   // Terminal states show the driver card in read-only "view" mode: a single Open
   // button (like the trip card), not the active Change-driver + Call buttons
@@ -996,7 +999,15 @@ function DrawerBody({
           }
           bodyStyle={{ backgroundColor: 'var(--surface-neutral-bg-default)' }}
         >
-          {tab === 0 && showSkeleton ? <DrawerSkeleton /> : tab === 0 ? overviewBody : tab === 1 ? placeholderBody('Activity') : placeholderBody('Dispatch Logs')}
+          {tab === 0 && showSkeleton ? (
+            <DrawerSkeleton />
+          ) : tab === 0 ? (
+            overviewBody
+          ) : tab === 1 ? (
+            <ActivityList items={activityItems} onViewProof={setProofView} />
+          ) : (
+            placeholderBody('Dispatch Logs')
+          )}
         </ModalShell>
       </div>
 
