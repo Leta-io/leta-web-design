@@ -28,8 +28,8 @@ import { useStore } from '../../store/useStore.js';
 import type { ClientConfig, Driver, Order, OrderStatus } from '../../store/types.js';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
 import { Popover, MenuPanel, MenuDivider } from '../Popover.js';
-import { buildActivityTrail } from './activityModel.js';
-import { ActivityList } from './ActivityTab.js';
+import { buildActivityTrail, DISPATCHER_NAME, type ActivityItem } from './activityModel.js';
+import { ActivityTimeline, ActivityComposerSection, ActivityTerminalNotice } from './ActivityTab.js';
 import { buildOrderDetail, type OrderDetailModel, type ProofFile } from './detailModel.js';
 import { ExpandedMapOverlay } from './OrderDetailMap.js';
 import { OrderOverviewCard } from './OrderOverviewCard.js';
@@ -413,6 +413,30 @@ function DrawerBody({
   const [menuAnchor, setMenuAnchor] = React.useState<DOMRect | null>(null);
   const [assignBanner, setAssignBanner] = React.useState(true);
   const [itemsPage, setItemsPage] = React.useState(1);
+
+  // Activity tab — local comment state (lives here so the composer, which is in the
+  // ModalShell footer, can append items that the timeline in the body displays).
+  const localCommentSeq = React.useRef(0);
+  const [localComments, setLocalComments] = React.useState<ActivityItem[]>([]);
+  const handleCommentPost = React.useCallback((text: string) => {
+    localCommentSeq.current += 1;
+    setLocalComments((prev) => [
+      ...prev,
+      {
+        id: `local-comment-${localCommentSeq.current}`,
+        leading: { kind: 'avatar', name: DISPATCHER_NAME },
+        title: [{ kind: 'name', text: DISPATCHER_NAME }, { kind: 'text', text: 'left a comment' }],
+        timestamp: new Date(),
+        blocks: [{ kind: 'comment', text, editable: true, edits: 0 }],
+        kind: 'comment',
+      },
+    ]);
+  }, []);
+  const reversedActivityItems = React.useMemo(
+    () => [...activityItems, ...localComments].reverse(),
+    [activityItems, localComments],
+  );
+  const isCompleted = status === 'delivered' || status === 'cancelled';
   // Items accordion: once paginated (>5 items), lock the item-rows region to the
   // full first-page (5-row) height so a short last page (e.g. 1 item) doesn't
   // shrink the accordion mid-browse. Measured off the full page 1 (no magic
@@ -894,7 +918,55 @@ function DrawerBody({
             />
           }
           footer={
-            hasFooter ? (
+            tab === 1 ? (
+              isCompleted ? (
+                <ActivityTerminalNotice />
+              ) : (
+                <>
+                  <ActivityComposerSection onPost={handleCommentPost} />
+                  {hasFooter && (
+                    <FooterFrame
+                      variant="tertiary-action"
+                      leading={
+                        footer.leading ? (
+                          <Button
+                            variant="ghost-error"
+                            size="medium"
+                            iconLeft={footer.leading === 'cancel' ? 'Delete' : 'Undo'}
+                            iconOutlined
+                            onClick={() => runAction(footer.leading!)}
+                          >
+                            {footer.leading === 'cancel' ? 'Cancel Order' : 'Return Order'}
+                          </Button>
+                        ) : undefined
+                      }
+                    >
+                      {footer.trailing.map((key) => (
+                        <Button
+                          key={key}
+                          variant="secondary"
+                          size="medium"
+                          iconLeft={TRAILING[key]!.icon}
+                          iconOutlined={TRAILING[key]!.outlined}
+                          onClick={() => runAction(key)}
+                        >
+                          {TRAILING[key]!.label}
+                        </Button>
+                      ))}
+                      {footer.overflow.length > 0 && (
+                        <Button
+                          variant="secondary"
+                          size="medium"
+                          iconOnly="More"
+                          aria-label="More actions"
+                          onClick={(e) => setMenuAnchor((e.currentTarget as HTMLElement).getBoundingClientRect())}
+                        />
+                      )}
+                    </FooterFrame>
+                  )}
+                </>
+              )
+            ) : hasFooter ? (
               <FooterFrame
                 variant="tertiary-action"
                 leading={
@@ -942,7 +1014,7 @@ function DrawerBody({
           ) : tab === 0 ? (
             overviewBody
           ) : tab === 1 ? (
-            <ActivityList items={activityItems} onViewProof={setProofView} />
+            <ActivityTimeline items={reversedActivityItems} onViewProof={setProofView} />
           ) : (
             placeholderBody('Dispatch Logs')
           )}

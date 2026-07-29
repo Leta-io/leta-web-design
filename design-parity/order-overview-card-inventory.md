@@ -81,3 +81,20 @@ comparison): `"27m 20s "` → 16px/600/rgb(16,16,16)/lineHeight 24;
 `"/ 30m SLA"` → 14px/400/rgb(128,128,128)/lineHeight 20 — byte-for-byte match to the
 bridge-read Figma runs. Eyebrow/title/subtext were already correct (ContentPrimitives
 + existing `text-label-m-regular` class) — no change needed there.
+
+## Re-enumeration pass (2026-07-29, second re-scan per user request)
+
+Full deep scan via figma-console bridge of all 13 variants. Confirmed:
+- All 13 share identical structure: CP + Demarcator + Metrics Section
+- Typography: all per-run styles confirmed correct (body-l-semibold / body-m-regular metric,
+  label-m-regular eyebrow, section-heading CP)
+- Badges: Scheduled 1+2 = **no badge** (null), not "Prev: 30m 23s" as the first inventory
+  erroneously stated; Returned = Prev badge; rest per existing model
+- CTA buttons confirmed: View Activity·History, Dispatch·Proceed, View Logs·Document-Outline
+
+**One layout discrepancy found and fixed:**
+
+3. **Child order was reversed.** Figma root children: `[Order Status Summary, Order Mini Map View]`
+   = Summary LEFT, Map RIGHT. Code had Map first (left), Summary second (right). Fixed:
+   swapped children; moved the 1px vertical divider border from the Map's `borderRight` to the
+   Summary's `borderRight` (Figma: the Summary frame carries a 1px stroke; the Map has none).

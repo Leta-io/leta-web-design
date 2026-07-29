@@ -14,11 +14,10 @@ import type { OrderDetailModel } from './detailModel.js';
  * of its 20 variants; see `design-parity/activity-entry-inventory.md`.
  */
 
-// The dispatcher persona for every non-creation dispatcher action, matching the
-// hardcoded "Dispatched By: Jude Bello" already shown in the Overview tab's More
-// Information section (`detailModel.ts` `dispatchedByLabel`) — kept consistent
-// rather than introducing a second dispatcher identity.
-const DISPATCHER_NAME = 'Jude Bello';
+// The logged-in dispatcher persona — "Alvin Simuiki" is the interactive
+// playground's user (TopBar / UserMenu), so every dispatcher action in the
+// activity trail and overview tab attributes to them.
+export const DISPATCHER_NAME = 'Alvin Simuiki';
 
 /** One inline segment of an activity row's rich title. */
 export type TitleSegment =

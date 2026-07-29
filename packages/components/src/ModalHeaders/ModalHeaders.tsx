@@ -200,8 +200,14 @@ export const ModalHeaders = React.forwardRef<HTMLDivElement, ModalHeadersProps>(
           )}
         </div>
 
-        {/* Tab row (with-tabs variant only) */}
-        {hasTabs && tabs}
+        {/* Tab row (with-tabs variant only) — negative margin breaks out of
+            the 20px horizontal padding so the PageTabsControl's demarcator
+            spans the full modal width; inner padding re-aligns the tab buttons. */}
+        {hasTabs && (
+          <div style={{ margin: '0 calc(-1 * var(--padding-20px))', padding: '0 var(--padding-20px)' }}>
+            {tabs}
+          </div>
+        )}
       </div>
     );
   },

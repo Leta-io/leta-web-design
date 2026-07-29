@@ -11,8 +11,8 @@ import { OrderMiniMap } from './OrderDetailMap.js';
  * (13 lifecycle variants), re-enumerated 2026-07-29 via the figma-wireframe-parity
  * skill — see `design-parity/order-overview-card-inventory.md`.
  *
- * Layout (HORIZONTAL): a fixed **320px** mini-map (`OrderMiniMap` → `MapView`) +
- * a flexible `Order Status Summary` column (`--padding-16px`/`20px`, gap 20):
+ * Layout (HORIZONTAL): a flexible `Order Status Summary` column (LEFT) +
+ * a fixed **320px** mini-map (RIGHT). Summary pad `--padding-16px`/`20px`, gap 20:
  *  1. `ContentPrimitives type="section-heading"` — Title (a per-state headline or
  *     the scheduled date/time) + Subtext, with the per-state **CTA** button in the
  *     `interactiveElements` trailing slot (Secondary/Medium/Leading-Icon):
@@ -108,12 +108,8 @@ export function OrderOverviewCard({
         flexShrink: 0,
       }}
     >
-      {/* Order Mini Map View — FIXED 320px (Figma), own right border = the divider. */}
-      <div style={{ flex: '0 0 320px', maxWidth: 320, borderRight: 'var(--stroke-xs) solid var(--border-neutral-default)' }}>
-        <OrderMiniMap order={order} depotName={depotName} depotAddress={depotAddress} onExpand={onExpandMap} />
-      </div>
-      {/* Order Status Summary — fills; section-heading + divider + SLA. */}
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, padding: 'var(--padding-16px) var(--padding-20px)', gap: 'var(--spacing-20px)' }}>
+      {/* Order Status Summary — fills; LEFT side per Figma child order. */}
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, padding: 'var(--padding-16px) var(--padding-20px)', gap: 'var(--spacing-20px)', borderRight: 'var(--stroke-xs) solid var(--border-neutral-default)' }}>
         <ContentPrimitives
           type="section-heading"
           text={model.summary.main}
@@ -130,6 +126,10 @@ export function OrderOverviewCard({
         />
         <div style={{ height: 0, borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)', width: '100%' }} />
         <SlaBlock model={model} elapsed={elapsed} />
+      </div>
+      {/* Order Mini Map View — FIXED 320px, RIGHT side. */}
+      <div style={{ flex: '0 0 320px', maxWidth: 320 }}>
+        <OrderMiniMap order={order} depotName={depotName} depotAddress={depotAddress} onExpand={onExpandMap} />
       </div>
     </div>
   );

@@ -14,7 +14,7 @@ import {
 } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
-import { activityTimestamp, type ActivityBodyBlock, type ActivityItem, type TitleSegment } from './activityModel.js';
+import { activityTimestamp, DISPATCHER_NAME, type ActivityBodyBlock, type ActivityItem, type TitleSegment } from './activityModel.js';
 import type { ProofFile } from './detailModel.js';
 
 /**
@@ -28,8 +28,6 @@ import type { ProofFile } from './detailModel.js';
  * bold-value field change, quoted comment, or proof/attachment links).
  */
 
-// Icons whose Figma instance renders the FILLED glyph (no "-Outline" sibling in
-// use here) — every other icon in this set defaults to its outlined form.
 const FILLED_ICONS = new Set<IconName>(['Swap', 'Lock', 'Update', 'Proceed']);
 
 function EntryIcon({ icon, size = 16, color }: { icon: IconName; size?: number; color?: string }): React.ReactElement {
@@ -238,7 +236,7 @@ function ActivityRow({
   );
 
   return (
-    <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%', paddingBottom: isLast ? 0 : 'var(--spacing-40px)' }}>
+    <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%', paddingBottom: isLast ? 0 : 'var(--spacing-24px)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 32 }}>
         <EntryLeading item={item} />
         {!isLast && <div style={{ flex: '1 0 0', width: 0, minHeight: 12, borderLeft: '1.5px dashed var(--border-neutral-default)' }} />}
@@ -263,78 +261,31 @@ const FILTERS: { key: ActivityFilter; label: string }[] = [
   { key: 'events', label: 'Events' },
 ];
 
-/** A locally-posted comment (session-only — resets when the drawer's `key={order.id}`
- *  remounts on order switch, matching the mock trail's own lack of persistence). */
-let localCommentSeq = 0;
-
 /**
- * Comment composer (Figma `383:104305`, "Comment" frame) — a `TextArea variant="rich"`
- * (the exact Bold/Italic/Underline + Attachment + Send toolbar already built for
- * Data Entry's rich Text Area) plus the "editable within 5 minutes" hint banner.
- * Posting appends a real, locally-visible Dispatcher Comment entry — session-only,
- * since the mock `Order` has no persisted comment log yet.
+ * The scrollable timeline region of the Activity tab — filter bar + timeline
+ * entries only. The comment composer and terminal notice are separate exports
+ * rendered in the ModalShell footer region (fixed, outside scroll).
+ *
+ * Items are expected to be pre-merged and pre-reversed (newest first) by the
+ * caller (OrderDetailDrawer).
  */
-function ActivityComposer({ onPost }: { onPost: (text: string) => void }): React.ReactElement {
-  const [text, setText] = React.useState('');
-  const send = () => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    onPost(trimmed);
-    setText('');
-  };
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)', width: '100%', background: 'var(--surface-neutral-bg-default)', paddingTop: 'var(--padding-16px)' }}>
-      <TextArea
-        variant="rich"
-        showLabel={false}
-        showHelper={false}
-        showCounter={false}
-        rows={3}
-        placeholder="Leave a comment"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onSend={send}
-      />
-      <NotificationBanner type="neutral" variant="subtle" description="Comments are editable within 5 minutes." />
-    </div>
-  );
-}
-
-export function ActivityList({
+export function ActivityTimeline({
   items,
   onViewProof,
 }: {
   items: ActivityItem[];
-  /** Opens the shared proof viewer (same modal the Overview tab uses) for a thumbnail. */
   onViewProof: (file: ProofFile) => void;
 }): React.ReactElement {
   const [filter, setFilter] = React.useState<ActivityFilter>('all');
-  const [localComments, setLocalComments] = React.useState<ActivityItem[]>([]);
 
   const onView = (thumbnailSrc: string, label: string) => {
     onViewProof({ src: thumbnailSrc, title: label, label, fileName: 'Image.png', viewer: label.toLowerCase().includes('signature') ? 'signature' : 'image' });
   };
 
-  const onPost = (text: string) => {
-    localCommentSeq += 1;
-    setLocalComments((prev) => [
-      ...prev,
-      {
-        id: `local-comment-${localCommentSeq}`,
-        leading: { kind: 'avatar', name: 'Jude Bello' },
-        title: [{ kind: 'name', text: 'Jude Bello' }, { kind: 'text', text: 'left a comment' }],
-        timestamp: new Date(),
-        blocks: [{ kind: 'comment', text, editable: true, edits: 0 }],
-        kind: 'comment',
-      },
-    ]);
-  };
-
-  const allItems = [...items, ...localComments];
-  const visible = filter === 'all' ? allItems : allItems.filter((i) => (filter === 'comments' ? i.kind === 'comment' : i.kind === 'event'));
+  const visible = filter === 'all' ? items : items.filter((i) => (filter === 'comments' ? i.kind === 'comment' : i.kind === 'event'));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0 var(--padding-24px) var(--padding-24px)', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0 var(--padding-24px)', boxSizing: 'border-box' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--surface-neutral-bg-default)', paddingTop: 'var(--padding-24px)', paddingBottom: 'var(--padding-16px)' }}>
         <TopFilterSection
           filters={FILTERS.map((f) => ({ label: f.label, selected: f.key === filter }))}
@@ -351,9 +302,77 @@ export function ActivityList({
           visible.map((item, i) => <ActivityRow key={item.id} item={item} isLast={i === visible.length - 1} onView={onView} />)
         )}
       </div>
-      <div style={{ position: 'sticky', bottom: 0, background: 'var(--surface-neutral-bg-default)' }}>
-        <ActivityComposer onPost={onPost} />
-      </div>
     </div>
   );
 }
+
+/**
+ * Fixed comment-composer section — rendered in the ModalShell footer region
+ * (outside the scrollable body). A 1px top demarcator separates it from the
+ * scroll area; the rich TextArea + editable-notice banner sit below.
+ */
+export function ActivityComposerSection({ onPost }: { onPost: (text: string) => void }): React.ReactElement {
+  const [text, setText] = React.useState('');
+  const send = () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    onPost(trimmed);
+    setText('');
+  };
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--spacing-16px)',
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: 'var(--padding-16px) var(--padding-24px)',
+        borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)',
+        background: 'var(--surface-neutral-bg-default)',
+      }}
+    >
+      <TextArea
+        variant="rich"
+        showLabel={false}
+        showHelper={false}
+        showCounter={false}
+        rows={3}
+        placeholder="Leave a comment"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onSend={send}
+      />
+      <NotificationBanner type="neutral" variant="subtle" description="Comments are editable within 5 minutes." />
+    </div>
+  );
+}
+
+/**
+ * Terminal-status notice — rendered in the ModalShell footer region for
+ * Delivered and Cancelled orders (no composer, no action buttons).
+ */
+export function ActivityTerminalNotice(): React.ReactElement {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--spacing-8px)',
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: 'var(--padding-16px) var(--padding-24px)',
+        borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)',
+        background: 'var(--surface-neutral-bg-default)',
+      }}
+    >
+      <Icon name="Info" outlined size={16} style={{ color: 'var(--icons-neutral-idle)', flexShrink: 0 }} />
+      <span className="text-label-m-regular" style={{ color: 'var(--text-default-label-idle)' }}>
+        Comments are not available for completed orders.
+      </span>
+    </div>
+  );
+}
+
+/** @deprecated Use {@link ActivityTimeline} + {@link ActivityComposerSection} instead. */
+export const ActivityList = ActivityTimeline;

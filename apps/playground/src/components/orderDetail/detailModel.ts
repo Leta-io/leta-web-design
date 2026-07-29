@@ -1,5 +1,6 @@
 import type { IconName } from '@leta/icons';
 import type { ClientConfig, DepotOption, Driver, Order, OrderStatus } from '../../store/types.js';
+import { DISPATCHER_NAME } from './activityModel.js';
 import {
   creatorFor,
   depotForOrder,
@@ -337,7 +338,7 @@ export function buildOrderDetail(
     // automated one the filled `Integration` glyph (which has no outline sibling).
     createdByIcon: humanCreator ? { icon: 'User', outlined: true } : { icon: 'Integration', outlined: false },
     dispatchedLabel: dispatched ? formatDateTime(dispatchTime) : 'N/A',
-    dispatchedByLabel: dispatched ? 'Jude Bello' : 'N/A',
+    dispatchedByLabel: dispatched ? DISPATCHER_NAME : 'N/A',
     deliveredLabel: status === 'delivered' || status === 'cancelled' ? formatDateTime(terminal) : 'N/A',
     cancellationReason,
     pod: {
