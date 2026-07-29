@@ -3,14 +3,15 @@ import { SearchInput } from '../SearchInput/SearchInput.js';
 import { Button } from '../Button/Button.js';
 import { Badge } from '../Badge/Badge.js';
 import { TopFilterSection, type TopFilterSectionItem } from '../TopFilterSection/TopFilterSection.js';
+import { SelectionControl } from '../SelectionControl/SelectionControl.js';
 
 /**
  * - `search-create` — search + filter buttons (Created / Filter / Sort By) on the
  *   left, primary CTAs (Add Order / Import-Export) on the right.
- * - `search-column` — the same search + filters, with a data count + Columns +
- *   Refresh controls on the right.
- * - `filters-column` — a Top Filter Section on the left, data count + Columns +
- *   Refresh on the right.
+ * - `search-column` — the same search + filters, with a data count + an
+ *   Auto-refresh switch + Columns control on the right.
+ * - `filters-column` — a Top Filter Section on the left, data count +
+ *   Auto-refresh switch + Columns on the right.
  */
 export type TableDataControlVariant = 'search-create' | 'search-column' | 'filters-column';
 
@@ -73,8 +74,14 @@ export interface TableDataControlProps
   onAddOrderClick?: () => void;
   onImportExportClick?: () => void;
   onColumnsClick?: () => void;
-  /** Fired by the Refresh icon-only button (column-control variants) — reloads the table. */
-  onRefreshClick?: () => void;
+  /**
+   * Controlled state of the **Auto-refresh** switch (column-control variants).
+   * When on, orders auto-refresh into the table — replaces the old manual
+   * Refresh button (Figma `7575:36637`). Omit for uncontrolled.
+   */
+  autoRefresh?: boolean;
+  /** Fired with the next value when the Auto-refresh switch is toggled. */
+  onAutoRefreshChange?: (checked: boolean) => void;
 }
 
 const GROUP: React.CSSProperties = { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'var(--spacing-8px)' };
@@ -135,13 +142,26 @@ function SearchAndFilter({
 }
 
 /**
- * Default column-control group: data count + divider, then the Columns and
- * Refresh buttons — both Secondary **icon-only** controls per Figma `7575:36637`
- * (Columns = outlined `Icon/Columns`, Refresh = filled `Icon/Refresh`, Refresh
- * trailing). Figma layout: the Count sub-frame (text + divider) has a 12px
- * inner gap; the group itself flows at 8px.
+ * Default column-control group: data count + divider, then an **Auto-refresh**
+ * Selection Control (switch), then the Columns button — per Figma `7575:36637`.
+ * The old Refresh icon-only button was removed: when the Auto-refresh toggle is
+ * ON, orders auto-refresh into the table, so a manual refresh is no longer
+ * needed. Columns = Secondary outlined `Icon/Columns`. Figma layout: the Count
+ * sub-frame (text + divider) has a 12px inner gap; the group flows at 8px.
  */
-function ColumnControl({ dataCount, showCount, onColumns, onRefresh }: { dataCount: string; showCount: boolean; onColumns?: () => void; onRefresh?: () => void }) {
+function ColumnControl({
+  dataCount,
+  showCount,
+  onColumns,
+  autoRefresh,
+  onAutoRefreshChange,
+}: {
+  dataCount: string;
+  showCount: boolean;
+  onColumns?: () => void;
+  autoRefresh?: boolean;
+  onAutoRefreshChange?: (checked: boolean) => void;
+}) {
   return (
     <div style={GROUP}>
       {showCount && (
@@ -150,8 +170,13 @@ function ColumnControl({ dataCount, showCount, onColumns, onRefresh }: { dataCou
           <div aria-hidden style={{ width: 'var(--stroke-xs)', height: 24, backgroundColor: 'var(--border-neutral-default)' }} />
         </div>
       )}
+      <SelectionControl
+        variant="switch"
+        label="Auto-refresh"
+        checked={autoRefresh}
+        onChange={onAutoRefreshChange}
+      />
       <Button variant="secondary" size="medium" iconOnly="Columns" iconOutlined aria-label="Columns" onClick={onColumns} />
-      <Button variant="secondary" size="medium" iconOnly="Refresh" aria-label="Refresh" onClick={onRefresh} />
     </div>
   );
 }
@@ -199,7 +224,8 @@ export const TableDataControl = React.forwardRef<HTMLDivElement, TableDataContro
       onAddOrderClick,
       onImportExportClick,
       onColumnsClick,
-      onRefreshClick,
+      autoRefresh,
+      onAutoRefreshChange,
       className,
       style,
       ...rest
@@ -225,7 +251,7 @@ export const TableDataControl = React.forwardRef<HTMLDivElement, TableDataContro
           )
         : !showColumnControl
           ? null
-          : columnControl ?? <ColumnControl dataCount={dataCount} showCount={showDataCount} onColumns={onColumnsClick} onRefresh={onRefreshClick} />;
+          : columnControl ?? <ColumnControl dataCount={dataCount} showCount={showDataCount} onColumns={onColumnsClick} autoRefresh={autoRefresh} onAutoRefreshChange={onAutoRefreshChange} />;
 
     return (
       <div

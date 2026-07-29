@@ -66,6 +66,19 @@ Every visual "major" is the parity tool comparing a CSS-var string to its resolv
 
 ---
 
+## Pending Figma sync (2026-07-29)
+
+Full report: [docs/figma-changes/FIGMA_CHANGES_2026-07-29.md](docs/figma-changes/FIGMA_CHANGES_2026-07-29.md). Full sync (tokens + catalog + 3 described updates).
+
+- [x] **New atom `ToggleButton`** ([10900:15545](https://figma.com/design/Kxbgc2KoJSmTxvSV3PwNEu/?node-id=10900-15545)) — icon-only 32×32 binary switch, `aria-pressed`, Button micro-animations. Built + stories + Figma description.
+- [x] **8 new `--*-toggle-button-*` tokens** (Mapped Colors) — snapshot refreshed + regenerated; `tokens:check` clean. No other variable changes.
+- [x] **Rich Text Area** (`38:42`) — Bold/Italic/Underline → `ToggleButton`.
+- [x] **Table Data Control** (`7575:36637`) — Refresh button → **Auto-refresh** switch (`SelectionControl`).
+- [x] **Playground** — Auto-refresh wired functional (default OFF).
+- [ ] **Publish the Figma library** — Toggle Button description write dirtied it (user action).
+
+---
+
 ## Pending Figma sync (2026-05-27)
 
 **Change report**: [docs/figma-changes/FIGMA_CHANGES_2026-05-27.md](docs/figma-changes/FIGMA_CHANGES_2026-05-27.md)

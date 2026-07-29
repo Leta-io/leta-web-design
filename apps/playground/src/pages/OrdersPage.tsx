@@ -295,6 +295,18 @@ function ensureBulkbarStyles(): void {
   document.head.appendChild(el);
 }
 
+// Synthetic "incoming" orders injected while the Auto-refresh switch is on
+// (simulates live orders flowing into the table, like the server-driven console).
+// Cycled by index; capped by AUTO_REFRESH_MAX so a left-on demo doesn't grow
+// unbounded — past the cap, ticks still flash the table (re-pull) without adding.
+const AUTO_REFRESH_MAX = 12;
+const AUTO_REFRESH_ORDERS: NewOrderInput[] = [
+  { customer: 'Brian Otieno', phone: '+254 733 010 201', depot: 'Westlands Fulfillment Hub', pickup: { label: '23 Ring Rd, Westlands, Nairobi', lat: -1.2683, lng: 36.808 }, dropoff: { label: '5 Peponi Rd, Spring Valley, Nairobi', lat: -1.246, lng: 36.783 }, package: 'Pharmacy delivery', items: 1, priority: 'express' },
+  { customer: 'Wanjiku Mwangi', phone: '+254 722 010 202', depot: 'Arc Kitisuru Depot', pickup: { label: '14 Kitisuru Rd, Kitisuru, Nairobi', lat: -1.242, lng: 36.777 }, dropoff: { label: '12 Riara Rd, Kilimani, Nairobi', lat: -1.293, lng: 36.782 }, package: 'Grocery order', items: 3, priority: 'standard' },
+  { customer: 'Samuel Kariuki', phone: '+254 711 010 203', depot: 'Industrial Area Depot', pickup: { label: '9 Enterprise Rd, Industrial Area, Nairobi', lat: -1.308, lng: 36.851 }, dropoff: { label: '44 Ngong Rd, Dagoretti, Nairobi', lat: -1.301, lng: 36.76 }, package: 'Auto parts', items: 2, priority: 'standard' },
+  { customer: 'Halima Abdi', phone: '+254 720 010 204', depot: 'Westlands Fulfillment Hub', pickup: { label: '23 Ring Rd, Westlands, Nairobi', lat: -1.2683, lng: 36.808 }, dropoff: { label: '2 Limuru Rd, Gigiri, Nairobi', lat: -1.233, lng: 36.812 }, package: 'Documents', items: 1, priority: 'express' },
+];
+
 export function OrdersPage(): React.ReactElement {
   ensureBulkbarStyles();
   const orders = useStore((s) => s.orders);
@@ -393,15 +405,26 @@ export function OrdersPage(): React.ReactElement {
       setTableKey((k) => k + 1);
     }, duration);
   };
-  // A manual Refresh is a more deliberate action than an automatic re-filter —
-  // slightly longer so it reads as "did something", not just a flicker.
-  // A refresh re-pulls the table's data — anything selected may no longer be in
-  // view (or may have changed status), so the selection + its floating toolbar
-  // clear along with it, same as a fresh load.
-  const handleRefresh = () => {
-    clearSelection();
-    flashTableLoading(1200);
-  };
+  // Auto-refresh (Table Data Control switch — replaces the old manual Refresh
+  // button; default OFF per design). When ON, orders auto-refresh into the
+  // table: on an interval we inject a fresh pending order (up to a cap) and
+  // flash the table, simulating live incoming orders. Toggling off / unmounting
+  // stops the interval.
+  const [autoRefresh, setAutoRefresh] = React.useState(false);
+  const autoAddedRef = React.useRef(0);
+  React.useEffect(() => {
+    if (!autoRefresh || !loaded) return;
+    const timer = setInterval(() => {
+      if (autoAddedRef.current < AUTO_REFRESH_MAX) {
+        const sample = AUTO_REFRESH_ORDERS[autoAddedRef.current % AUTO_REFRESH_ORDERS.length]!;
+        addOrder({ ...sample, status: 'pending' });
+        autoAddedRef.current += 1;
+      }
+      flashTableLoading(450);
+    }, 9000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh, loaded]);
   // Add Order — opens the config-aware side drawer (empty-state CTA + toolbar both
   // route here). Submitting creates the order, reveals the table, and toasts.
   const [addOrderOpen, setAddOrderOpen] = React.useState(false);
@@ -1265,7 +1288,8 @@ export function OrdersPage(): React.ReactElement {
                   variant="filters-column"
                   dataCount={`${filtered.length} Order${filtered.length === 1 ? '' : 's'}`}
                   onColumnsClick={() => openFromFocus('columns')}
-                  onRefreshClick={handleRefresh}
+                  autoRefresh={autoRefresh}
+                  onAutoRefreshChange={setAutoRefresh}
                   filters={<TopFilterSection filters={TABS} onFilterClick={handleFilterClick} animatedSelection />}
                 />
               </>

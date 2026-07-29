@@ -8196,6 +8196,158 @@
           "id": "VariableID:5838:400956"
         }
       }
+    },
+    {
+      "id": "VariableID:10900:15531",
+      "name": "Border/neutral/toggle-button-idle",
+      "type": "COLOR",
+      "scopes": [
+        "STROKE_COLOR"
+      ],
+      "valuesByMode": {
+        "5841:4": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401076"
+        },
+        "6371:0": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401065"
+        }
+      }
+    },
+    {
+      "id": "VariableID:10900:15532",
+      "name": "Border/neutral/toggle-button-hover",
+      "type": "COLOR",
+      "scopes": [
+        "STROKE_COLOR"
+      ],
+      "valuesByMode": {
+        "5841:4": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401074"
+        },
+        "6371:0": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401067"
+        }
+      }
+    },
+    {
+      "id": "VariableID:10900:15533",
+      "name": "Border/neutral/toggle-button-pressed",
+      "type": "COLOR",
+      "scopes": [
+        "STROKE_COLOR"
+      ],
+      "valuesByMode": {
+        "5841:4": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:6347:27431"
+        },
+        "6371:0": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401068"
+        }
+      }
+    },
+    {
+      "id": "VariableID:10900:15534",
+      "name": "Border/secondary/toggle-button-selected",
+      "type": "COLOR",
+      "scopes": [
+        "STROKE_COLOR"
+      ],
+      "valuesByMode": {
+        "5841:4": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5984:241644"
+        },
+        "6371:0": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5984:241642"
+        }
+      }
+    },
+    {
+      "id": "VariableID:10900:15535",
+      "name": "Surface/neutral/toggle-button-idle",
+      "type": "COLOR",
+      "scopes": [
+        "FRAME_FILL",
+        "SHAPE_FILL",
+        "EFFECT_COLOR"
+      ],
+      "valuesByMode": {
+        "5841:4": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401076"
+        },
+        "6371:0": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401065"
+        }
+      }
+    },
+    {
+      "id": "VariableID:10900:15536",
+      "name": "Surface/neutral/toggle-button-hover",
+      "type": "COLOR",
+      "scopes": [
+        "FRAME_FILL",
+        "SHAPE_FILL",
+        "EFFECT_COLOR"
+      ],
+      "valuesByMode": {
+        "5841:4": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401074"
+        },
+        "6371:0": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401067"
+        }
+      }
+    },
+    {
+      "id": "VariableID:10900:15537",
+      "name": "Surface/neutral/toggle-button-pressed",
+      "type": "COLOR",
+      "scopes": [
+        "FRAME_FILL",
+        "SHAPE_FILL",
+        "EFFECT_COLOR"
+      ],
+      "valuesByMode": {
+        "5841:4": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:6347:27431"
+        },
+        "6371:0": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5839:401068"
+        }
+      }
+    },
+    {
+      "id": "VariableID:10900:15538",
+      "name": "Surface/secondary/toggle-button-selected",
+      "type": "COLOR",
+      "scopes": [
+        "FRAME_FILL",
+        "SHAPE_FILL",
+        "EFFECT_COLOR"
+      ],
+      "valuesByMode": {
+        "5841:4": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5984:241645"
+        },
+        "6371:0": {
+          "type": "VARIABLE_ALIAS",
+          "id": "VariableID:5984:241636"
+        }
+      }
     }
   ]
 }

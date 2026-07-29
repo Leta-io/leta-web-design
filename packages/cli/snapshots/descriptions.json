@@ -280,6 +280,10 @@
     "9626:14490": {
       "name": "Page",
       "description": "Page \u2014 a full desktop application screen: a collapsed Side Bar rail beside a viewport of a Top Bar and a scrolling body. The body opens with a page Title and a Page Tabs Control, then an info Notification Banner, then the screen's main content.\n\nVariants:\n\u2022 Data Table \u2014 a Table Container (search / filter toolbar + table + pagination); for browsing and acting on a set of records.\n\u2022 Configuration \u2014 a Sidetab nav beside a column of Configuration Cards; for grouped settings and toggleable sections.\n\nThe Side Bar and Top Bar stay fixed; only the body scrolls. Composition only \u2014 every region is an already-built organism or molecule.\n\nWhen to use: the top-level shell for a product screen.\nWhen NOT to use: a modal / dialog flow (use the Templates), or a single component in isolation."
+    },
+    "10900:15545": {
+      "name": "Toggle Button",
+      "description": "What It Is\nThe Toggle Button is a specialized, binary user interface component used to switch a specific state, setting, or mode on or off. Unlike a standard action button (which triggers an immediate, forward-bound process like \"Submit\" or \"Delete\"), a toggle button acts as a persistent visual switch that holds its state until clicked again.\n\nHow It Should Be Used\n\u2022 Standalone Toggles: Use it for isolated settings that can be independently enabled or disabled (e.g., \"Mute Microphone\", \"Bookmark\", or \"Pin to Dashboard\").\n\u2022 Contextual Settings: Use it in tools or dashboards where an option modifies a view or changes formatting rules (e.g., text formatting toolbars).\n\u2022 Immediate Feedback: When clicked, the state must change instantly on the UI without requiring a secondary \"Save\" action.\n\u2022 Do Not Use For: Standard navigation paths, form submissions, or opening dropdown menus.\n\nAccessibility\nThe pressed/unpressed state is exposed via aria-pressed (\"Toggle Button, pressed\" / \"Toggle Button, not pressed\"), toggled in code on each activation \u2014 so screen readers announce it as a toggle, not a plain button."
     }
   }
 }

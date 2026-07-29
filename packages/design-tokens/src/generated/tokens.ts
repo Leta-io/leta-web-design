@@ -1607,6 +1607,22 @@ export const tokens = {
   borderPrimaryAltDesktopBadge: '--border-primary-alt-desktop-badge',
   /** Border/primary/default */
   borderPrimaryDefault: '--border-primary-default',
+  /** Border/neutral/toggle-button-idle */
+  borderNeutralToggleButtonIdle: '--border-neutral-toggle-button-idle',
+  /** Border/neutral/toggle-button-hover */
+  borderNeutralToggleButtonHover: '--border-neutral-toggle-button-hover',
+  /** Border/neutral/toggle-button-pressed */
+  borderNeutralToggleButtonPressed: '--border-neutral-toggle-button-pressed',
+  /** Border/secondary/toggle-button-selected */
+  borderSecondaryToggleButtonSelected: '--border-secondary-toggle-button-selected',
+  /** Surface/neutral/toggle-button-idle */
+  surfaceNeutralToggleButtonIdle: '--surface-neutral-toggle-button-idle',
+  /** Surface/neutral/toggle-button-hover */
+  surfaceNeutralToggleButtonHover: '--surface-neutral-toggle-button-hover',
+  /** Surface/neutral/toggle-button-pressed */
+  surfaceNeutralToggleButtonPressed: '--surface-neutral-toggle-button-pressed',
+  /** Surface/secondary/toggle-button-selected */
+  surfaceSecondaryToggleButtonSelected: '--surface-secondary-toggle-button-selected',
   /** Inter Family */
   interFamily: '--inter-family',
   /** Breakpoint */

@@ -1,5 +1,7 @@
 export { Toggle } from './Toggle/index.js';
 export type { ToggleProps } from './Toggle/index.js';
+export { ToggleButton } from './ToggleButton/index.js';
+export type { ToggleButtonProps } from './ToggleButton/index.js';
 export { Checkbox } from './Checkbox/index.js';
 export type { CheckboxProps } from './Checkbox/index.js';
 export { RadioButton } from './RadioButton/index.js';

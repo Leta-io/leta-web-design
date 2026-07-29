@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Icon, type IconName } from '@leta/icons';
 import { Button } from '../Button/Button.js';
+import { ToggleButton } from '../ToggleButton/ToggleButton.js';
 
 export type TextAreaVariant = 'basic' | 'rich';
 
@@ -8,10 +9,13 @@ export interface TextAreaProps
   extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'rows'> {
   /** `basic` plain multi-line field, or `rich` with a formatting-toolbar footer. Default `basic`. */
   variant?: TextAreaVariant;
-  /** Rich-toolbar handlers (Bold / Italic / Underline / Attach / Send). */
-  onBold?: () => void;
-  onItalic?: () => void;
-  onUnderline?: () => void;
+  /**
+   * Rich-toolbar handlers. Bold / Italic / Underline are Toggle Buttons — their
+   * handler receives the new pressed state; Attach / Send are one-shot actions.
+   */
+  onBold?: (pressed: boolean) => void;
+  onItalic?: (pressed: boolean) => void;
+  onUnderline?: (pressed: boolean) => void;
   onAttach?: () => void;
   onSend?: () => void;
   /** Label text. */
@@ -214,9 +218,10 @@ export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(fun
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
-              <Button variant="ghost" size="small" iconOnly="Format-Bold" aria-label="Bold" onClick={onBold} disabled={disabled} />
-              <Button variant="ghost" size="small" iconOnly="Format-Italics" aria-label="Italic" onClick={onItalic} disabled={disabled} />
-              <Button variant="ghost" size="small" iconOnly="Format-Underline" aria-label="Underline" onClick={onUnderline} disabled={disabled} />
+              {/* Formatting toggles — Toggle Buttons that hold their pressed state (Figma `38:42` Rich footer). */}
+              <ToggleButton icon="Format-Bold" aria-label="Bold" onPressedChange={onBold} disabled={disabled} />
+              <ToggleButton icon="Format-Italics" aria-label="Italic" onPressedChange={onItalic} disabled={disabled} />
+              <ToggleButton icon="Format-Underline" aria-label="Underline" onPressedChange={onUnderline} disabled={disabled} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
               <Button variant="ghost" size="small" iconOnly="Attachment" aria-label="Attach file" onClick={onAttach} disabled={disabled} />
