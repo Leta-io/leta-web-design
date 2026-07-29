@@ -30,8 +30,9 @@ import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from 
 import { Popover, MenuPanel, MenuDivider } from '../Popover.js';
 import { buildActivityTrail } from './activityModel.js';
 import { ActivityList } from './ActivityTab.js';
-import { buildOrderDetail, fmtClock, slaHeadline, type OrderDetailModel, type ProofFile } from './detailModel.js';
-import { ExpandedMapOverlay, OrderMiniMap } from './OrderDetailMap.js';
+import { buildOrderDetail, type OrderDetailModel, type ProofFile } from './detailModel.js';
+import { ExpandedMapOverlay } from './OrderDetailMap.js';
+import { OrderOverviewCard } from './OrderOverviewCard.js';
 
 /**
  * View Order drawer (Order Detail View, OM §7) — the Overview tab of the
@@ -263,41 +264,6 @@ function ProofRow({ file, onView }: { file: ProofFile; onView: (f: ProofFile) =>
   );
 }
 
-/**
- * **SLA Visibility** (Order Overview Card `1452:181083`) — a vertical gap-8
- * stack: an `Eyebrow` row (label + ⓘ), then the `Metric` row. The SLA badge sits
- * on the **Metric row**, `space-between` against the counter and vertically
- * centred with it — NOT up beside the eyebrow.
- */
-function SlaBlock({ model, elapsed }: { model: OrderDetailModel; elapsed: number }): React.ReactElement {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', width: '100%' }}>
-      {/* Content > Eyebrow */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-4px)' }}>
-        <span className="text-label-m-regular" style={{ color: 'var(--text-default-eyebrow-text)' }}>
-          {slaHeadline(model.order.status)}
-        </span>
-        <HoverTip label="Time spent fulfilling this order, against its SLA.">
-          <span style={{ display: 'flex', color: 'var(--icons-neutral-idle)' }}>
-            <Icon name="Question" outlined size={16} />
-          </span>
-        </HoverTip>
-      </div>
-      {/* Metric — counter | SLA badge */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-8px)', width: '100%' }}>
-        <span style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-4px)', minWidth: 0 }}>
-          <span className="text-heading-s-semibold" style={{ color: 'var(--text-default-heading)' }}>
-            {fmtClock(elapsed)}
-          </span>
-          <span className="text-body-m-regular" style={{ color: 'var(--text-default-helper)' }}> / 30m SLA</span>
-        </span>
-        {model.slaBadge && (
-          <Badge color={model.slaBadge.color} label={model.slaBadge.label} leadingIcon={model.slaBadge.icon} />
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── The drawer ───────────────────────────────────────────────────────────────────
 
@@ -542,45 +508,17 @@ function DrawerBody({
         />
       )}
 
-      {/* Order Overview Card — mini map + status summary. */}
-      <div
-        style={{
-          display: 'flex',
-          width: '100%',
-          height: 168,
-          borderRadius: 'var(--rounding-xl)',
-          border: 'var(--stroke-xs) solid var(--border-neutral-default)',
-          overflow: 'hidden',
-          backgroundColor: 'var(--surface-neutral-bg-default)',
-          flexShrink: 0,
-        }}
-      >
-        {/* Map half — Figma gives BOTH halves their own 1px border, so the two
-            meet as a vertical divider down the middle of the card. */}
-        <div style={{ width: '50%', flexShrink: 0, borderRight: 'var(--stroke-xs) solid var(--border-neutral-default)' }}>
-          <OrderMiniMap order={order} depotName={depotName} depotAddress={depotAddress} onExpand={() => setMapExpanded(true)} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, padding: 'var(--padding-16px) var(--padding-20px)', gap: 'var(--spacing-20px)' }}>
-          <SlaBlock model={model} elapsed={elapsed} />
-          <div style={{ height: 0, borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)', width: '100%' }} />
-          <ContentPrimitives
-            type="utility"
-            text={model.summary.main}
-            /* One-line sub-copy (matches Figma) — the fixed 168px card can't
-               absorb a wrap. Figma keeps it on one line at this width with the
-               medium CTA, so nowrap is the fix (do NOT shrink the CTA). */
-            subtext={<span style={{ whiteSpace: 'nowrap' }}>{summarySub}</span>}
-            showVisualAnchor={false}
-            showPassiveElements={false}
-            showInteractiveElements
-            interactiveElements={
-              <Button variant="secondary" size="medium" onClick={summaryCta}>
-                {model.summary.ctaLabel}
-              </Button>
-            }
-          />
-        </div>
-      </div>
+      {/* Order Overview Card (local component `1452:181083`). */}
+      <OrderOverviewCard
+        order={order}
+        model={model}
+        depotName={depotName}
+        depotAddress={depotAddress}
+        elapsed={elapsed}
+        summarySub={summarySub}
+        onExpandMap={() => setMapExpanded(true)}
+        onCta={summaryCta}
+      />
 
       {/* Pickup Code Banner (Figma `1454:207769`) — a dark-accented banner, NOT a
           white card: lavender `bg-raised` surface, radius lg, px-20 py-16; the
