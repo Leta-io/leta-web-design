@@ -56,3 +56,28 @@ badge relocated eyebrow row.
 - Base-scheduled (variant 1, "Scheduled delivery date") shows **Prev: 30m 23s**, but the
   current model returns `null` for scheduled (a fresh scheduled order has no prior attempt).
   Scheduled-2 (about-to-broadcast) shows none. → confirm with user.
+
+## Correction pass (2026-07-29, re-enumerated per user report of styling bugs)
+
+Re-scanned with exact per-text-node style extraction (font size/weight/line-height/
+letter-spacing + per-range fill color), not just component-property text content.
+Found two real bugs in the first pass's `SlaBlock` metric row:
+
+1. **Wrong typography class for the elapsed number.** Used `text-heading-s-semibold`
+   (20px) — the real Figma run is **`text-body-l-semibold` (16px SemiBold, lineHeight
+   24)**, color `--text-default-label` (`#101010`) — confirmed via `getRangeFontSize`/
+   `getRangeFontName` on the live text node (bridge), not assumed from a prior build.
+2. **Double-spacing between the number and "/ 30m SLA".** The metric is **ONE Figma
+   text node with two style runs** (`Metric` frame has `childCount: 1`) — "27m 20s "
+   (trailing space in the 16px run) + "/ 30m SLA" (14px Regular, `--text-default-helper`
+   `#808080`, no leading space). The code wrapped both halves in a flex row with
+   `gap: var(--spacing-4px)` AND kept a leading space on the second span — stacking a
+   flex gap on top of the space character already provided a real gap once. Fixed:
+   plain inline nested `<span>`s (no flex/gap), trailing space moved onto the first
+   (16px) run to match the exact Figma run split.
+
+Both confirmed via live computed-style extraction in the running app (not just visual
+comparison): `"27m 20s "` → 16px/600/rgb(16,16,16)/lineHeight 24;
+`"/ 30m SLA"` → 14px/400/rgb(128,128,128)/lineHeight 20 — byte-for-byte match to the
+bridge-read Figma runs. Eyebrow/title/subtext were already correct (ContentPrimitives
++ existing `text-label-m-regular` class) — no change needed there.

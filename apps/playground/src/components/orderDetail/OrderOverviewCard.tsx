@@ -56,10 +56,15 @@ function SlaBlock({ model, elapsed }: { model: OrderDetailModel; elapsed: number
           <Badge color={model.slaBadge.color} label={model.slaBadge.label} leadingIcon={model.slaBadge.icon} />
         )}
       </div>
-      {/* Metric — "{elapsed} / 30m SLA" */}
-      <span style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--spacing-4px)', minWidth: 0 }}>
-        <span className="text-heading-s-semibold" style={{ color: 'var(--text-default-heading)' }}>{fmtClock(elapsed)}</span>
-        <span className="text-body-m-regular" style={{ color: 'var(--text-default-helper)' }}> / 30m SLA</span>
+      {/* Metric — ONE continuous text run in Figma ("27m 20s " + "/ 30m SLA"), not
+          two flex-gapped spans: the trailing space belongs to the first (16px
+          SemiBold) run, so no extra gap is added — that previously double-spaced
+          the two halves. Verified via bridge per-range styles 2026-07-29:
+          run 1 = Body/L/SemiBold (16/24/-0.28) `--text-default-label`;
+          run 2 = Body/M/Regular (14/20/-0.28) `--text-default-helper`. */}
+      <span style={{ minWidth: 0 }}>
+        <span className="text-body-l-semibold" style={{ color: 'var(--text-default-label)' }}>{fmtClock(elapsed)} </span>
+        <span className="text-body-m-regular" style={{ color: 'var(--text-default-helper)' }}>/ 30m SLA</span>
       </span>
     </div>
   );
