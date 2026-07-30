@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   FeaturedIcon,
+  FooterFrame,
   NotificationBanner,
   TextArea,
   TopFilterSection,
@@ -97,7 +98,7 @@ function FieldBlock({ block }: { block: Extract<ActivityBodyBlock, { kind: 'fiel
   );
 }
 
-function CommentBlock({ block, bare }: { block: Extract<ActivityBodyBlock, { kind: 'comment' }>; bare?: boolean }): React.ReactElement {
+function CommentBlock({ block, bare, onEdit }: { block: Extract<ActivityBodyBlock, { kind: 'comment' }>; bare?: boolean; onEdit?: () => void }): React.ReactElement {
   // Figma `1487:173226` (Dispatcher Comment (Editable)): the `Comment` frame holds
   // ONLY the body text (V, pad 16, bg secondary-bg-subtle, radius 12 / `--rounding-xl`).
   // The "N Edits" label + Edit button live in a SEPARATE `Edit section` row BELOW
@@ -125,15 +126,55 @@ function CommentBlock({ block, bare }: { block: Extract<ActivityBodyBlock, { kin
       {/* Edit section — Figma `Edit section`: H, gap 10, SPACE_BETWEEN, below the
           card on the default surface. "N Edits" = Label/M/Regular /
           `--text-default-label-idle`; Edit button = Plain / Medium / Leading Icon,
-          outlined `Edit-Outline` glyph, no underline (`Show Underline: false`). */}
+          outlined `Edit-Outline` glyph, no underline (`Show Underline: false`).
+          Edit is only offered on the user's OWN comment (`editable`), and clicking
+          it swaps the row into the inline editor (see CommentEditor). */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' }}>
         <span className="text-label-m-regular" style={{ color: 'var(--text-default-label-idle)' }}>{block.edits} Edits</span>
         {block.editable && (
-          <Button variant="plain" size="medium" iconLeft="Edit" iconOutlined showUnderline={false}>
+          <Button variant="plain" size="medium" iconLeft="Edit" iconOutlined showUnderline={false} onClick={onEdit}>
             Edit
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Inline comment editor — the Figma "Dispatcher Comment (Editing)" state
+ * (`1685:119878`), shown after the user clicks Edit on their OWN comment. Replaces
+ * the comment card + edit section with a Rich Data Entry (State=Active, pre-filled,
+ * **Send hidden** — formatting toggles only) stacked (gap 8) above a Card Footer
+ * carrying Cancel (Secondary) + Save (Primary), right-aligned.
+ */
+function CommentEditor({
+  initialHtml,
+  onCancel,
+  onSave,
+}: {
+  initialHtml: string;
+  onCancel: () => void;
+  onSave: (html: string) => void;
+}): React.ReactElement {
+  const [html, setHtml] = React.useState(initialHtml);
+  const canSave = htmlToPlainText(html).trim().length > 0;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', width: '100%' }}>
+      <TextArea
+        variant="rich"
+        showLabel={false}
+        showHelper={false}
+        showCounter={false}
+        showSend={false}
+        value={html}
+        onChange={setHtml}
+        style={{ width: '100%' }}
+      />
+      <FooterFrame variant="card">
+        <Button variant="secondary" size="medium" onClick={onCancel}>Cancel</Button>
+        <Button variant="primary" size="medium" disabled={!canSave} onClick={() => canSave && onSave(html)}>Save</Button>
+      </FooterFrame>
     </div>
   );
 }
@@ -177,10 +218,10 @@ function AttachmentsBlock({
   );
 }
 
-function EntryBody({ blocks, onView }: { blocks: ActivityBodyBlock[]; onView: (thumbnailSrc: string, label: string) => void }): React.ReactElement | null {
+function EntryBody({ blocks, onView, onStartEdit }: { blocks: ActivityBodyBlock[]; onView: (thumbnailSrc: string, label: string) => void; onStartEdit?: () => void }): React.ReactElement | null {
   if (blocks.length === 0) return null;
   if (blocks.length === 1 && blocks[0]!.kind === 'comment') {
-    return <CommentBlock block={blocks[0] as Extract<ActivityBodyBlock, { kind: 'comment' }>} bare />;
+    return <CommentBlock block={blocks[0] as Extract<ActivityBodyBlock, { kind: 'comment' }>} bare onEdit={onStartEdit} />;
   }
   return (
     <div
@@ -228,13 +269,26 @@ function ActivityRow({
   item,
   isLast,
   onView,
+  editing,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
 }: {
   item: ActivityItem;
   isLast: boolean;
   onView: (thumbnailSrc: string, label: string) => void;
+  editing: boolean;
+  onStartEdit: (id: string) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (id: string, html: string) => void;
 }): React.ReactElement {
   const { open, toggle } = useAccordion(true);
   const hasBody = item.blocks.length > 0;
+  // A single editable comment (the user's own) can switch into the inline editor.
+  const editableComment =
+    item.blocks.length === 1 && item.blocks[0]!.kind === 'comment' && item.blocks[0]!.editable
+      ? (item.blocks[0] as Extract<ActivityBodyBlock, { kind: 'comment' }>)
+      : null;
 
   // Figma `Title + Date`: H, gap 10, cross CENTER, main SPACE_BETWEEN, h 32. The
   // chevron is a Plain / Icon Only / Small Button at 16×16 (not the section
@@ -296,7 +350,15 @@ function ActivityRow({
         {hasBody ? <AccordionHeader open={open} onToggle={toggle}>{header}</AccordionHeader> : header}
         {hasBody && (
           <AccordionContent open={open} topGap="0px" gap="0px">
-            <EntryBody blocks={item.blocks} onView={onView} />
+            {editing && editableComment ? (
+              <CommentEditor
+                initialHtml={editableComment.text}
+                onCancel={onCancelEdit}
+                onSave={(html) => onSaveEdit(item.id, html)}
+              />
+            ) : (
+              <EntryBody blocks={item.blocks} onView={onView} onStartEdit={() => onStartEdit(item.id)} />
+            )}
           </AccordionContent>
         )}
       </div>
@@ -323,11 +385,16 @@ const FILTERS: { key: ActivityFilter; label: string }[] = [
 export function ActivityTimeline({
   items,
   onViewProof,
+  onEditComment,
 }: {
   items: ActivityItem[];
   onViewProof: (file: ProofFile) => void;
+  /** Commit an edited comment (id + new sanitized HTML). Only fired for the
+   *  user's own editable comments. */
+  onEditComment?: (id: string, html: string) => void;
 }): React.ReactElement {
   const [filter, setFilter] = React.useState<ActivityFilter>('all');
+  const [editingId, setEditingId] = React.useState<string | null>(null);
 
   const onView = (thumbnailSrc: string, label: string) => {
     onViewProof({ src: thumbnailSrc, title: label, label, fileName: 'Image.png', viewer: label.toLowerCase().includes('signature') ? 'signature' : 'image' });
@@ -353,7 +420,21 @@ export function ActivityTimeline({
             No {filter} yet.
           </div>
         ) : (
-          visible.map((item, i) => <ActivityRow key={item.id} item={item} isLast={i === visible.length - 1} onView={onView} />)
+          visible.map((item, i) => (
+            <ActivityRow
+              key={item.id}
+              item={item}
+              isLast={i === visible.length - 1}
+              onView={onView}
+              editing={editingId === item.id}
+              onStartEdit={setEditingId}
+              onCancelEdit={() => setEditingId(null)}
+              onSaveEdit={(id, html) => {
+                onEditComment?.(id, html);
+                setEditingId(null);
+              }}
+            />
+          ))
         )}
       </div>
     </div>
@@ -369,7 +450,9 @@ export function ActivityTimeline({
  * the header divider, which is full-bleed). So the border is drawn on an inner
  * element within the 16px inset rather than on the full-width root.
  *
- * Spacing: `Container` gap 20 (divider → content), `Main Body` pad-bottom 24.
+ * Spacing: `Container` gap 20 (divider → content), `Main Body` pad-bottom 8
+ * (the designer tightened the Activity-tab Main Body to `[24,16,8,16]` — the
+ * composer's own bottom breathing room is now 8px).
  */
 function BottomRegion({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
@@ -390,7 +473,7 @@ function BottomRegion({ children }: { children: React.ReactNode }): React.ReactE
           boxSizing: 'border-box',
           borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)',
           paddingTop: 'var(--padding-20px)',
-          paddingBottom: 'var(--padding-24px)',
+          paddingBottom: 'var(--padding-8px)',
         }}
       >
         {children}

@@ -73,6 +73,27 @@ dashed `Line` (`grow 1`) therefore runs **through** that 40px gap and meets the 
 row's icon (the stacking frame has `gap: 0`). Putting the padding on the row root makes
 `align-self: stretch` stop at the row's content box → the line ends early → visible gap.
 
+## Update 2026-07-30 — Main Body padding + Editing state
+
+- **Main Body `1489:181974` padding changed** for the Activity tab: `[24,16,24,16]` →
+  **`[24,16,8,16]`** (bottom 24 → 8). The composer's own bottom breathing room is now
+  8px — applied to `BottomRegion`'s `paddingBottom` (both the composer and the
+  completed-order notice use it).
+
+- **New variant: Dispatcher Comment (Editing) `1685:119878`** — the state after the
+  user clicks **Edit** on their OWN comment (`editable: true` only; never another
+  dispatcher's `editable: false` comment). The comment card + Edit section is replaced
+  by, inside `Timeline Details` (V, gap 8):
+  1. A **Rich Data Entry** (`Type=Text Area, Variant=Rich, State=Active`), pre-filled
+     with the comment, **Send button hidden** (`Trailing Buttons` `visible:false`) — so
+     the field footer shows only the B/I/U formatting toggles.
+  2. A **Footer Frame** `Property 1 = Card Footer`, `Show Leading Content=false`, whose
+     Trailing Content is **Cancel** (Secondary / Medium / No Icon) + **Save** (Primary /
+     Medium / No Icon), right-aligned, gap 8.
+  Implemented as `CommentEditor` (composes `TextArea variant="rich" showSend={false}` +
+  `FooterFrame variant="card"`), swapped in by `ActivityRow` when `editingId === item.id`.
+  Save commits the new text and bumps "N Edits"; Cancel discards.
+
 ### Last row
 The creation variants (`1487:173217` / `1487:173234`, h = 72) have **no `Line` child** in
 their `Branch` — but still carry `Timeline Details` `pad [0,0,40,0]`. So: no line on the

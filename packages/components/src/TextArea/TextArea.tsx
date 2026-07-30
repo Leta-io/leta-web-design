@@ -87,6 +87,13 @@ export interface TextAreaRichProps extends TextAreaShared {
   onItalic?: (active: boolean) => void;
   onUnderline?: (active: boolean) => void;
   onSend?: () => void;
+  /**
+   * Show the trailing Primary Send button in the footer toolbar. Default `true`
+   * (the composer case). Set `false` for the inline-edit case (Figma's Editing
+   * variant hides the footer's Trailing Buttons — formatting toggles only — and
+   * the Save/Cancel actions live in a separate Card Footer below the field).
+   */
+  showSend?: boolean;
   onFocus?: React.FocusEventHandler<HTMLDivElement>;
   onBlur?: React.FocusEventHandler<HTMLDivElement>;
 }
@@ -252,7 +259,7 @@ const RichField = React.forwardRef<HTMLDivElement, {
   const {
     placeholder = 'Some descriptive text here would be very nice to see', disabled = false,
     maxLength, value, defaultValue, onChange, showCounter = true,
-    onBold, onItalic, onUnderline, onSend, onFocus, onBlur,
+    onBold, onItalic, onUnderline, onSend, showSend = true, onFocus, onBlur,
   } = props;
 
   const editableRef = React.useRef<HTMLDivElement>(null);
@@ -539,15 +546,18 @@ const RichField = React.forwardRef<HTMLDivElement, {
             field holds no visible text: Figma ships this button in its `Disabled`
             state alongside an Idle (empty) field, so there is nothing to send yet.
             Emptiness is measured on the plain text, not the markup, so an empty
-            bolded span doesn't count as content. */}
-        <Button
-          variant="primary"
-          size="small"
-          iconOnly="Up-Arrow"
-          aria-label="Send"
-          onClick={onSend}
-          disabled={disabled || !hasContent}
-        />
+            bolded span doesn't count as content. Hidden entirely in the inline-edit
+            case (`showSend={false}`), where Save/Cancel live in a Card Footer below. */}
+        {showSend && (
+          <Button
+            variant="primary"
+            size="small"
+            iconOnly="Up-Arrow"
+            aria-label="Send"
+            onClick={onSend}
+            disabled={disabled || !hasContent}
+          />
+        )}
 
       </div>
     </div>

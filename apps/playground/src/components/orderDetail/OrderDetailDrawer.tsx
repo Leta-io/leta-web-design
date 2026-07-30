@@ -432,6 +432,18 @@ function DrawerBody({
       },
     ]);
   }, []);
+  // Commit an inline comment edit — only the user's own (local) comments are
+  // editable, so this only ever targets `localComments`. Updates the text and
+  // bumps the edit counter (Figma's "N Edits").
+  const handleCommentEdit = React.useCallback((id: string, html: string) => {
+    setLocalComments((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c;
+        const prevEdits = c.blocks[0]?.kind === 'comment' ? c.blocks[0].edits ?? 0 : 0;
+        return { ...c, blocks: [{ kind: 'comment', text: html, editable: true, edits: prevEdits + 1 }] };
+      }),
+    );
+  }, []);
   const reversedActivityItems = React.useMemo(
     () => [...activityItems, ...localComments].reverse(),
     [activityItems, localComments],
@@ -1014,7 +1026,7 @@ function DrawerBody({
           ) : tab === 0 ? (
             overviewBody
           ) : tab === 1 ? (
-            <ActivityTimeline items={reversedActivityItems} onViewProof={setProofView} />
+            <ActivityTimeline items={reversedActivityItems} onViewProof={setProofView} onEditComment={handleCommentEdit} />
           ) : (
             placeholderBody('Dispatch Logs')
           )}
