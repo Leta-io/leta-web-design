@@ -10,12 +10,14 @@ import {
   NotificationBanner,
   TextArea,
   TopFilterSection,
+  htmlToPlainText,
   useAccordion,
 } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
 import { activityTimestamp, DISPATCHER_NAME, type ActivityBodyBlock, type ActivityItem, type TitleSegment } from './activityModel.js';
 import type { ProofFile } from './detailModel.js';
+import { renderRichText } from '../../lib/richText.js';
 
 /**
  * Activity tab (Order Detail drawer) — the local "Activity" entry component
@@ -111,7 +113,7 @@ function CommentBlock({ block, bare }: { block: Extract<ActivityBodyBlock, { kin
       }}
     >
       <p className="text-label-m-regular" style={{ margin: 0, color: 'var(--text-default-body)', width: '100%' }}>
-        &ldquo;{block.text}&rdquo;
+        &ldquo;{renderRichText(block.text)}&rdquo;
       </p>
       {block.edits != null && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -311,13 +313,15 @@ export function ActivityTimeline({
  * (outside the scrollable body). A 1px top demarcator separates it from the
  * scroll area; the rich TextArea + editable-notice banner sit below.
  */
-export function ActivityComposerSection({ onPost }: { onPost: (text: string) => void }): React.ReactElement {
-  const [text, setText] = React.useState('');
+export function ActivityComposerSection({ onPost }: { onPost: (html: string) => void }): React.ReactElement {
+  // `html` is sanitized rich text (bold/italic/underline/line-breaks only —
+  // see `sanitizeRichText`); emptiness is checked on visible text, not the
+  // markup string, so e.g. an empty bolded span doesn't count as content.
+  const [html, setHtml] = React.useState('');
   const send = () => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    onPost(trimmed);
-    setText('');
+    if (htmlToPlainText(html).trim().length === 0) return;
+    onPost(html);
+    setHtml('');
   };
   return (
     <div
@@ -337,10 +341,9 @@ export function ActivityComposerSection({ onPost }: { onPost: (text: string) => 
         showLabel={false}
         showHelper={false}
         showCounter={false}
-        rows={3}
         placeholder="Leave a comment"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+        value={html}
+        onChange={setHtml}
         onSend={send}
       />
       <NotificationBanner type="neutral" variant="subtle" description="Comments are editable within 5 minutes." />

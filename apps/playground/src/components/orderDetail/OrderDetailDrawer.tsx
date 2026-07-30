@@ -418,7 +418,7 @@ function DrawerBody({
   // ModalShell footer, can append items that the timeline in the body displays).
   const localCommentSeq = React.useRef(0);
   const [localComments, setLocalComments] = React.useState<ActivityItem[]>([]);
-  const handleCommentPost = React.useCallback((text: string) => {
+  const handleCommentPost = React.useCallback((html: string) => {
     localCommentSeq.current += 1;
     setLocalComments((prev) => [
       ...prev,
@@ -427,7 +427,7 @@ function DrawerBody({
         leading: { kind: 'avatar', name: DISPATCHER_NAME },
         title: [{ kind: 'name', text: DISPATCHER_NAME }, { kind: 'text', text: 'left a comment' }],
         timestamp: new Date(),
-        blocks: [{ kind: 'comment', text, editable: true, edits: 0 }],
+        blocks: [{ kind: 'comment', text: html, editable: true, edits: 0 }],
         kind: 'comment',
       },
     ]);

@@ -40,6 +40,7 @@ export interface AttachmentItem {
 export type ActivityBodyBlock =
   | { kind: 'status'; icon: IconName; lead: string; from: OrderStatus; to: OrderStatus }
   | { kind: 'field'; icon: IconName; lead: string; from: string; to: string }
+  /** `text` may carry the Rich Text Area's allowlisted markup (bold/italic/underline/line-breaks) — always render via `renderRichText`, never as raw text. */
   | { kind: 'comment'; text: string; edits?: number; editable?: boolean }
   | { kind: 'attachments'; items: AttachmentItem[] };
 
