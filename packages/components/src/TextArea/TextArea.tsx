@@ -86,14 +86,24 @@ export interface TextAreaRichProps extends TextAreaShared {
   onBold?: (active: boolean) => void;
   onItalic?: (active: boolean) => void;
   onUnderline?: (active: boolean) => void;
-  onSend?: () => void;
   /**
-   * Show the trailing Primary Send button in the footer toolbar. Default `true`
-   * (the composer case). Set `false` for the inline-edit case (Figma's Editing
-   * variant hides the footer's Trailing Buttons — formatting toggles only — and
-   * the Save/Cancel actions live in a separate Card Footer below the field).
+   * Trailing footer slot (Figma `38:42` Text Area / Rich — `Trailing Buttons`
+   * SLOT). Whatever ReactNode you pass renders here, right of the formatting
+   * toggles. Omit for the DS default (a Secondary "Cancel" + Primary "Save",
+   * wired to `onCancel`/`onSave`); pass `null` for no trailing region at all
+   * (inline-edit variant, where Save/Cancel live in a separate card footer).
    */
-  showSend?: boolean;
+  trailing?: React.ReactNode;
+  /** Wired to the default trailing Save button. Ignored when `trailing` is set. */
+  onSave?: () => void;
+  /** Wired to the default trailing Cancel button. Ignored when `trailing` is set. */
+  onCancel?: () => void;
+  /**
+   * Disable the default trailing Save button. Default `false` — the Save button
+   * ships as Idle per Figma and enables the enter/submit action even on an
+   * empty draft unless the caller opts in.
+   */
+  saveDisabled?: boolean;
   onFocus?: React.FocusEventHandler<HTMLDivElement>;
   onBlur?: React.FocusEventHandler<HTMLDivElement>;
 }
@@ -259,7 +269,7 @@ const RichField = React.forwardRef<HTMLDivElement, {
   const {
     placeholder = 'Some descriptive text here would be very nice to see', disabled = false,
     maxLength, value, defaultValue, onChange, showCounter = true,
-    onBold, onItalic, onUnderline, onSend, showSend = true, onFocus, onBlur,
+    onBold, onItalic, onUnderline, trailing, onSave, onCancel, saveDisabled = false, onFocus, onBlur,
   } = props;
 
   const editableRef = React.useRef<HTMLDivElement>(null);
@@ -541,24 +551,21 @@ const RichField = React.forwardRef<HTMLDivElement, {
             disabled={disabled}
           />
         </div>
-        {/* Trailing section — single Primary Send button (Figma `38:42` Rich footer;
-            the previous Attach slot was removed by the designer). Disabled while the
-            field holds no visible text: Figma ships this button in its `Disabled`
-            state alongside an Idle (empty) field, so there is nothing to send yet.
-            Emptiness is measured on the plain text, not the markup, so an empty
-            bolded span doesn't count as content. Hidden entirely in the inline-edit
-            case (`showSend={false}`), where Save/Cancel live in a Card Footer below. */}
-        {showSend && (
-          <Button
-            variant="primary"
-            size="small"
-            iconOnly="Up-Arrow"
-            aria-label="Send"
-            onClick={onSend}
-            disabled={disabled || !hasContent}
-          />
+        {/* Trailing section — SLOT (Figma `38:42` Text Area / Rich): whatever the
+            caller passes via `trailing` renders here. The DS default is a Secondary
+            "Cancel" + Primary "Save" (Small, always Idle per Figma) wired to the
+            `onCancel`/`onSave` callbacks; pass `trailing={null}` to render nothing
+            (inline-edit variant, where Save/Cancel live in a separate card footer). */}
+        {trailing !== null && (
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
+            {trailing ?? (
+              <>
+                <Button variant="secondary" size="small" onClick={onCancel} disabled={disabled}>Cancel</Button>
+                <Button variant="primary" size="small" onClick={onSave} disabled={disabled || saveDisabled}>Save</Button>
+              </>
+            )}
+          </div>
         )}
-
       </div>
     </div>
   );

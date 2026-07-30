@@ -161,12 +161,14 @@ function CommentEditor({
   const canSave = htmlToPlainText(html).trim().length > 0;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', width: '100%' }}>
+      {/* Inline-edit case — the Save/Cancel actions live in the Card Footer
+          below, so we render the rich field with an empty trailing slot. */}
       <TextArea
         variant="rich"
         showLabel={false}
         showHelper={false}
         showCounter={false}
-        showSend={false}
+        trailing={null}
         value={html}
         onChange={setHtml}
         style={{ width: '100%' }}
@@ -491,8 +493,9 @@ export function ActivityComposerSection({ onPost }: { onPost: (html: string) => 
   // see `sanitizeRichText`); emptiness is checked on visible text, not the
   // markup string, so e.g. an empty bolded span doesn't count as content.
   const [html, setHtml] = React.useState('');
-  const send = () => {
-    if (htmlToPlainText(html).trim().length === 0) return;
+  const canSave = htmlToPlainText(html).trim().length > 0;
+  const save = () => {
+    if (!canSave) return;
     onPost(html);
     setHtml('');
   };
@@ -506,10 +509,15 @@ export function ActivityComposerSection({ onPost }: { onPost: (html: string) => 
         placeholder="Leave a comment"
         value={html}
         onChange={setHtml}
-        onSend={send}
-        // TextArea's root is a fixed `width: 350` by default; Figma's instance here
-        // is `szH: FILL`, so it must be stretched to the region width. The Send
-        // button self-disables until there's text (see TextArea).
+        // Trailing slot uses the DS default (Cancel + Save, both Idle per Figma).
+        // Save ships Idle by design — the composer gates empty submissions in
+        // `save()` above (also via `saveDisabled` here so the button reads
+        // disabled visually while the field has no text). Cancel clears the draft.
+        onSave={save}
+        onCancel={() => setHtml('')}
+        saveDisabled={!canSave}
+        // TextArea's root is a fixed `width: 350` by default; Figma's instance
+        // here is `szH: FILL`, so it must stretch to the region width.
         style={{ width: '100%' }}
       />
       <NotificationBanner type="neutral" variant="subtle" description="Comments are editable within 5 minutes." />
