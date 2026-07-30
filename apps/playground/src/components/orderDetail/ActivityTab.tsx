@@ -98,13 +98,14 @@ function FieldBlock({ block }: { block: Extract<ActivityBodyBlock, { kind: 'fiel
 }
 
 function CommentBlock({ block, bare }: { block: Extract<ActivityBodyBlock, { kind: 'comment' }>; bare?: boolean }): React.ReactElement {
-  return (
+  // Figma `1487:173226` (Dispatcher Comment (Editable)): the `Comment` frame holds
+  // ONLY the body text (V, pad 16, bg secondary-bg-subtle, radius 12 / `--rounding-xl`).
+  // The "N Edits" label + Edit button live in a SEPARATE `Edit section` row BELOW
+  // the card — a sibling in Timeline Details (gap 8), on the default surface — NOT
+  // inside the tinted card.
+  const card = (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--spacing-16px)',
-        alignItems: 'flex-start',
         padding: 'var(--padding-16px)',
         width: '100%',
         boxSizing: 'border-box',
@@ -115,14 +116,24 @@ function CommentBlock({ block, bare }: { block: Extract<ActivityBodyBlock, { kin
       <p className="text-label-m-regular" style={{ margin: 0, color: 'var(--text-default-body)', width: '100%' }}>
         &ldquo;{renderRichText(block.text)}&rdquo;
       </p>
-      {block.edits != null && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <span className="text-label-m-regular" style={{ color: 'var(--text-default-label-idle)', fontStyle: 'normal' }}>{block.edits} Edits</span>
-          {block.editable && (
-            <Button variant="plain" size="medium" iconLeft="Edit">Edit</Button>
-          )}
-        </div>
-      )}
+    </div>
+  );
+  if (block.edits == null) return card;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', width: '100%' }}>
+      {card}
+      {/* Edit section — Figma `Edit section`: H, gap 10, SPACE_BETWEEN, below the
+          card on the default surface. "N Edits" = Label/M/Regular /
+          `--text-default-label-idle`; Edit button = Plain / Medium / Leading Icon,
+          outlined `Edit-Outline` glyph, no underline (`Show Underline: false`). */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%' }}>
+        <span className="text-label-m-regular" style={{ color: 'var(--text-default-label-idle)' }}>{block.edits} Edits</span>
+        {block.editable && (
+          <Button variant="plain" size="medium" iconLeft="Edit" iconOutlined showUnderline={false}>
+            Edit
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
