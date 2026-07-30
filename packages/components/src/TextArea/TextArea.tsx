@@ -290,6 +290,13 @@ const RichField = React.forwardRef<HTMLDivElement, {
     const plain = htmlToPlainText(clean);
     setHasContent(plain.length > 0);
     setPlainLength(plain.length);
+    // `replaceContent` wipes the DOM the format state was derived from, so any
+    // sticky-format marker is gone and the toolbar's pressed state is now stale.
+    // Reset it — otherwise clearing the field after Send leaves e.g. Bold lit up
+    // over an empty field, and the next keystroke wouldn't actually be bold.
+    stickyMarkerRef.current = null;
+    pendingFormatsRef.current = new Set();
+    setActiveFormats(new Set());
   }, [value]);
 
   const notifyChange = React.useCallback(() => {
@@ -528,8 +535,19 @@ const RichField = React.forwardRef<HTMLDivElement, {
           />
         </div>
         {/* Trailing section — single Primary Send button (Figma `38:42` Rich footer;
-            the previous Attach slot was removed by the designer). */}
-        <Button variant="primary" size="small" iconOnly="Up-Arrow" aria-label="Send" onClick={onSend} disabled={disabled} />
+            the previous Attach slot was removed by the designer). Disabled while the
+            field holds no visible text: Figma ships this button in its `Disabled`
+            state alongside an Idle (empty) field, so there is nothing to send yet.
+            Emptiness is measured on the plain text, not the markup, so an empty
+            bolded span doesn't count as content. */}
+        <Button
+          variant="primary"
+          size="small"
+          iconOnly="Up-Arrow"
+          aria-label="Send"
+          onClick={onSend}
+          disabled={disabled || !hasContent}
+        />
 
       </div>
     </div>

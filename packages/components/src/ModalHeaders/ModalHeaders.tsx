@@ -120,12 +120,17 @@ export const ModalHeaders = React.forwardRef<HTMLDivElement, ModalHeadersProps>(
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
           // Bottom-only divider painted as inset box-shadow (like the project
-          // convention) so it doesn't add to the auto height. Omitted for
-          // with-tabs because the PageTabsControl demarcator serves as the line.
+          // convention) so it doesn't add to the auto height.
+          //
+          // Applied to BOTH variants: in Figma the header root itself carries the
+          // bottom stroke (`strokeSides [0,0,1,0]`) at the FULL modal width, while
+          // the nested PageTabsControl's own `Demarcator` is inset by this
+          // component's 20px horizontal padding. The two sit coincident, so the
+          // edge-to-edge line the design shows is this one — do NOT try to widen
+          // the tabs control to produce it (a negative-margin wrapper cancels
+          // itself out, since the control re-applies the same padding internally).
           border: 'none',
-          boxShadow: hasTabs
-            ? 'none'
-            : `inset 0 -1px 0 var(--border-neutral-default)`,
+          boxShadow: `inset 0 -1px 0 var(--border-neutral-default)`,
           ...style,
         }}
         {...rest}
@@ -200,14 +205,11 @@ export const ModalHeaders = React.forwardRef<HTMLDivElement, ModalHeadersProps>(
           )}
         </div>
 
-        {/* Tab row (with-tabs variant only) — negative margin breaks out of
-            the 20px horizontal padding so the PageTabsControl's demarcator
-            spans the full modal width; inner padding re-aligns the tab buttons. */}
-        {hasTabs && (
-          <div style={{ margin: '0 calc(-1 * var(--padding-20px))', padding: '0 var(--padding-20px)' }}>
-            {tabs}
-          </div>
-        )}
+        {/* Tab row (with-tabs variant only) — stays inset within the header's
+            20px horizontal padding, mirroring Figma's 728-wide Tab Container.
+            The edge-to-edge line under it is the header root's own bottom stroke
+            (see the boxShadow above), not this control's demarcator. */}
+        {hasTabs && tabs}
       </div>
     );
   },

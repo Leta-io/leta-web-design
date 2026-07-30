@@ -225,11 +225,14 @@ function ActivityRow({
   const { open, toggle } = useAccordion(true);
   const hasBody = item.blocks.length > 0;
 
+  // Figma `Title + Date`: H, gap 10, cross CENTER, main SPACE_BETWEEN, h 32. The
+  // chevron is a Plain / Icon Only / Small Button at 16×16 (not the section
+  // organisms' Ghost / Prominent one) — hence `variant="plain"`.
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-8px)', width: '100%', minHeight: 32 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minHeight: 32 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)', minWidth: 0 }}>
         <TitleRow segments={item.title} />
-        {hasBody && <AccordionChevron open={open} onToggle={toggle} size={16} />}
+        {hasBody && <AccordionChevron open={open} onToggle={toggle} size={16} variant="plain" />}
       </div>
       <span className="text-body-s-regular" style={{ color: 'var(--text-default-label-idle)', whiteSpace: 'nowrap', flexShrink: 0 }}>
         {activityTimestamp(item.timestamp)}
@@ -237,13 +240,48 @@ function ActivityRow({
     </div>
   );
 
+  // Row structure mirrors Figma `1487:173235` → `Details` (H, gap 12):
+  //   Branch (HUG × FILL, cross CENTER) | Timeline Details (V, gap 8, pad [0,0,40,0])
+  //
+  // The 40px inter-row gap is the CONTENT column's own paddingBottom — never the
+  // row root's. `Branch` stretches the row's full height, so its dashed line runs
+  // *through* that gap and meets the next row's icon (the list stacks with gap 0),
+  // producing one continuous timeline. Putting the padding on the row root instead
+  // makes `align-self: stretch` stop at the row's content box, so the line ends
+  // early and each row shows a visible break.
+  //
+  // Every row carries the 40px pad, including the last (Figma's creation variants
+  // are 72 = 32 title + 40 pad) — which doubles as the end-of-scroll breathing room.
   return (
-    <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%', paddingBottom: isLast ? 0 : 'var(--spacing-24px)' }}>
+    <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 32 }}>
         <EntryLeading item={item} />
-        {!isLast && <div style={{ flex: '1 0 0', width: 0, minHeight: 12, borderLeft: '1.5px dashed var(--border-neutral-default)' }} />}
+        {/* Figma `Line`: VECTOR, strokeWeight 1, dashPattern [6, 6], centered in the
+            32px column. A repeating gradient reproduces the exact 6/6 rhythm — CSS
+            `border-left: dashed` would use the browser's own dash length instead.
+            Omitted on the last row (Figma's creation variants have no Line child). */}
+        {!isLast && (
+          <div
+            style={{
+              flex: '1 0 0',
+              width: 1,
+              minHeight: 12,
+              backgroundImage:
+                'repeating-linear-gradient(to bottom, var(--border-neutral-default) 0 6px, transparent 6px 12px)',
+            }}
+          />
+        )}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', flex: '1 0 0', minWidth: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--spacing-8px)',
+          flex: '1 0 0',
+          minWidth: 0,
+          paddingBottom: 'var(--spacing-40px)',
+        }}
+      >
         {hasBody ? <AccordionHeader open={open} onToggle={toggle}>{header}</AccordionHeader> : header}
         {hasBody && (
           <AccordionContent open={open} topGap="0px" gap="0px">
@@ -286,9 +324,12 @@ export function ActivityTimeline({
 
   const visible = filter === 'all' ? items : items.filter((i) => (filter === 'comments' ? i.kind === 'comment' : i.kind === 'event'));
 
+  // Figma `Main Body`: pad [24,16,24,16], gap 24 between the filter row and the
+  // scroll frame. Horizontal padding is 16 — the composer section below uses the
+  // same inset so its demarcator lines up.
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0 var(--padding-24px)', boxSizing: 'border-box' }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--surface-neutral-bg-default)', paddingTop: 'var(--padding-24px)', paddingBottom: 'var(--padding-16px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0 var(--padding-16px)', boxSizing: 'border-box' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--surface-neutral-bg-default)', paddingTop: 'var(--padding-24px)', paddingBottom: 'var(--padding-24px)' }}>
         <TopFilterSection
           filters={FILTERS.map((f) => ({ label: f.label, selected: f.key === filter }))}
           onFilterClick={(i) => setFilter(FILTERS[i]!.key)}
@@ -309,9 +350,47 @@ export function ActivityTimeline({
 }
 
 /**
- * Fixed comment-composer section — rendered in the ModalShell footer region
- * (outside the scrollable body). A 1px top demarcator separates it from the
- * scroll area; the rich TextArea + editable-notice banner sit below.
+ * Shared chrome for the two fixed bottom regions (composer / terminal notice).
+ *
+ * Both sit in the ModalShell footer region, outside the scrollable body. In Figma
+ * the divider above them is the **Scroll Frame's** bottom stroke, which is 736 wide
+ * — i.e. inset by the Main Body's 16px horizontal padding, NOT edge-to-edge (unlike
+ * the header divider, which is full-bleed). So the border is drawn on an inner
+ * element within the 16px inset rather than on the full-width root.
+ *
+ * Spacing: `Container` gap 20 (divider → content), `Main Body` pad-bottom 24.
+ */
+function BottomRegion({ children }: { children: React.ReactNode }): React.ReactElement {
+  return (
+    <div
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: '0 var(--padding-16px)',
+        background: 'var(--surface-neutral-bg-default)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--spacing-16px)',
+          width: '100%',
+          boxSizing: 'border-box',
+          borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)',
+          paddingTop: 'var(--padding-20px)',
+          paddingBottom: 'var(--padding-24px)',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Fixed comment-composer section — the Figma `Comment` frame (V, gap 16): a Rich
+ * Data Entry that fills the width, plus the editable-notice banner.
  */
 export function ActivityComposerSection({ onPost }: { onPost: (html: string) => void }): React.ReactElement {
   // `html` is sanitized rich text (bold/italic/underline/line-breaks only —
@@ -324,18 +403,7 @@ export function ActivityComposerSection({ onPost }: { onPost: (html: string) => 
     setHtml('');
   };
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--spacing-16px)',
-        width: '100%',
-        boxSizing: 'border-box',
-        padding: 'var(--padding-16px) var(--padding-24px)',
-        borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)',
-        background: 'var(--surface-neutral-bg-default)',
-      }}
-    >
+    <BottomRegion>
       <TextArea
         variant="rich"
         showLabel={false}
@@ -345,9 +413,13 @@ export function ActivityComposerSection({ onPost }: { onPost: (html: string) => 
         value={html}
         onChange={setHtml}
         onSend={send}
+        // TextArea's root is a fixed `width: 350` by default; Figma's instance here
+        // is `szH: FILL`, so it must be stretched to the region width. The Send
+        // button self-disables until there's text (see TextArea).
+        style={{ width: '100%' }}
       />
       <NotificationBanner type="neutral" variant="subtle" description="Comments are editable within 5 minutes." />
-    </div>
+    </BottomRegion>
   );
 }
 
@@ -357,23 +429,14 @@ export function ActivityComposerSection({ onPost }: { onPost: (html: string) => 
  */
 export function ActivityTerminalNotice(): React.ReactElement {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 'var(--spacing-8px)',
-        width: '100%',
-        boxSizing: 'border-box',
-        padding: 'var(--padding-16px) var(--padding-24px)',
-        borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)',
-        background: 'var(--surface-neutral-bg-default)',
-      }}
-    >
-      <Icon name="Info" outlined size={16} style={{ color: 'var(--icons-neutral-idle)', flexShrink: 0 }} />
-      <span className="text-label-m-regular" style={{ color: 'var(--text-default-label-idle)' }}>
-        Comments are not available for completed orders.
-      </span>
-    </div>
+    <BottomRegion>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
+        <Icon name="Info" outlined size={16} style={{ color: 'var(--icons-neutral-idle)', flexShrink: 0 }} />
+        <span className="text-label-m-regular" style={{ color: 'var(--text-default-label-idle)' }}>
+          Comments are not available for completed orders.
+        </span>
+      </div>
+    </BottomRegion>
   );
 }
 

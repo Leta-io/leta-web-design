@@ -44,9 +44,9 @@ function ensureAccordionStyles(): void {
   el.textContent = `
 .leta-accordion-head { cursor: pointer; border-radius: var(--rounding-md); outline: none; }
 .leta-accordion-chevron { background: transparent; border-radius: var(--rounding-lg); transition: background-color 120ms cubic-bezier(0.2, 0, 0, 1); }
-.leta-accordion-chevron:hover,
-.leta-accordion-head:hover .leta-accordion-chevron,
-.leta-accordion-head:focus-visible .leta-accordion-chevron { background-color: var(--surface-neutral-ghost-button-hover); }
+.leta-accordion-chevron--ghost:hover,
+.leta-accordion-head:hover .leta-accordion-chevron--ghost,
+.leta-accordion-head:focus-visible .leta-accordion-chevron--ghost { background-color: var(--surface-neutral-ghost-button-hover); }
 .leta-accordion-head:focus-visible { outline: var(--stroke-sm) solid var(--border-secondary-component-focus); outline-offset: 2px; }
 .leta-accordion-head:focus:not(:focus-visible) { outline: none; }
 @media (prefers-reduced-motion: reduce) {
@@ -84,24 +84,36 @@ export function AccordionHeader({ open, onToggle, children }: AccordionHeaderPro
 }
 
 /**
- * Ghost / Prominent Icon-Only chevron. Transparent idle; goes to the ghost-hover
- * fill when the enclosing {@link AccordionHeader} is hovered/focused (via CSS) or
- * when hovered directly. The chevron rotates 180° between closed (down) and open
- * (up) with an ease-in-out transition. This is the semantic toggle control.
+ * The accordion's chevron toggle. Rotates 180° between closed (down) and open (up)
+ * with an ease-in-out transition. This is the semantic toggle control.
+ *
+ * Two visual treatments, mirroring the two Button variants the designs use:
+ * - `ghost` (default) — **Ghost / Prominent Icon-Only**, a 40×40 box that takes the
+ *   ghost-hover fill when the enclosing {@link AccordionHeader} is hovered/focused
+ *   (via CSS) or when hovered directly. Used by the section organisms (List / Table
+ *   / Input Section) and the Order Detail accordions.
+ * - `plain` — **Plain / Icon-Only / Small**, a bare glyph hugging the icon with no
+ *   hover fill. Used by the Activity-tab timeline entries (Figma `1487:173235`,
+ *   where the chevron instance is `Variant=Plain, Type=Icon Only, Size=Small`
+ *   at 16×16).
  */
 export function AccordionChevron({
   open,
   onToggle,
   size = 24,
+  variant = 'ghost',
 }: {
   open: boolean;
   onToggle: () => void;
   size?: number;
+  /** Visual treatment — see the doc comment. Defaults to `ghost`. */
+  variant?: 'ghost' | 'plain';
 }): React.ReactElement {
+  const ghost = variant === 'ghost';
   return (
     <button
       type="button"
-      className="leta-accordion-chevron"
+      className={`leta-accordion-chevron leta-accordion-chevron--${variant}`}
       aria-label={open ? 'Collapse section' : 'Expand section'}
       aria-expanded={open}
       onClick={(e) => {
@@ -112,10 +124,11 @@ export function AccordionChevron({
       style={{
         // Idle background, border-radius, and background-color transition live in
         // the injected `.leta-accordion-chevron` CSS — NOT inline — so the
-        // `.leta-accordion-head:hover .leta-accordion-chevron` rule can win
+        // `.leta-accordion-head:hover .leta-accordion-chevron--ghost` rule can win
         // (inline styles beat stylesheet rules). Only layout props stay inline.
-        width: 40,
-        height: 40,
+        // Plain hugs the glyph (no 40×40 box, no hover fill).
+        width: ghost ? 40 : size,
+        height: ghost ? 40 : size,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
