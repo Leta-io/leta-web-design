@@ -94,6 +94,35 @@ row's icon (the stacking frame has `gap: 0`). Putting the padding on the row roo
   `FooterFrame variant="card"`), swapped in by `ActivityRow` when `editingId === item.id`.
   Save commits the new text and bumps "N Edits"; Cancel discards.
 
+## Update 2026-07-31 — Comment Field (idle⇆active) + editing reflow + padding revert
+
+- **Main Body `1489:181974` padding reverted** to `[24,16,24,16]` (bottom 8 → 24).
+  `BottomRegion` `paddingBottom` back to 24.
+
+- **New component: Comment Field `1691:120714`** (docked composer, replaces the
+  always-rich composer). Sibling of the Scroll Frame at the bottom of the Container
+  (gap 20). Two variants:
+  - **Idle** (h 76): the dispatcher **Avatar** (40, Medium, `Empty-Teal`, "AS") +
+    a single-line **Input Field / Basic** placeholder "Leave a comment"
+    (`--surface-neutral-input-field`, 1px `--border-neutral-default`, radius 8, pad
+    10/12) + the "Comments are editable within 5 minutes." Notification Banner.
+  - **Active** (h 208): same, single-line swapped for the **Text Area / Rich**
+    (auto-focused). Rich footer = B/I/U toggles + **Cancel (Secondary) + Save
+    (Primary), Small** in the `Trailing Buttons` SLOT.
+  Click the idle field OR the footer **Add Comment** button → Active (auto-focus).
+  Cancel discards + collapses; Save posts + collapses. Idle↔active height animates
+  (interruptible; `make-interfaces-feel-better`). Implemented as `CommentField` +
+  `AnimatedHeight` in `ActivityTab.tsx`; `commentActive` lifted to `OrderDetailDrawer`
+  so **Add Comment** (`runAction('addComment')` → `setTab(1)` + activate) expands it.
+
+- **Editing `1685:119878` reflowed** (h 300 → 252): the separate **Card Footer** with
+  Cancel/Save is **removed**; Cancel + Save (Small) now live in the rich footer's
+  **Trailing Buttons SLOT** (same as the composer). `CommentEditor` now uses the DS
+  default trailing (`onCancel`/`onSave`/`saveDisabled`) + `autoFocus`, no FooterFrame.
+
+- **DS `TextArea variant="rich"` gained `autoFocus`** — focuses the field + places the
+  caret at the end of seeded content on mount (used by both composer-active and edit).
+
 ### Last row
 The creation variants (`1487:173217` / `1487:173234`, h = 72) have **no `Line` child** in
 their `Branch` — but still carry `Timeline Details` `pad [0,0,40,0]`. So: no line on the

@@ -104,6 +104,13 @@ export interface TextAreaRichProps extends TextAreaShared {
    * empty draft unless the caller opts in.
    */
   saveDisabled?: boolean;
+  /**
+   * Focus the field on mount and place the caret at the end of any seeded
+   * content. Use when the rich field appears in response to a user action (e.g.
+   * expanding a collapsed comment composer, or entering inline-edit) so the user
+   * can type immediately.
+   */
+  autoFocus?: boolean;
   onFocus?: React.FocusEventHandler<HTMLDivElement>;
   onBlur?: React.FocusEventHandler<HTMLDivElement>;
 }
@@ -269,7 +276,7 @@ const RichField = React.forwardRef<HTMLDivElement, {
   const {
     placeholder = 'Some descriptive text here would be very nice to see', disabled = false,
     maxLength, value, defaultValue, onChange, showCounter = true,
-    onBold, onItalic, onUnderline, trailing, onSave, onCancel, saveDisabled = false, onFocus, onBlur,
+    onBold, onItalic, onUnderline, trailing, onSave, onCancel, saveDisabled = false, autoFocus = false, onFocus, onBlur,
   } = props;
 
   const editableRef = React.useRef<HTMLDivElement>(null);
@@ -290,6 +297,16 @@ const RichField = React.forwardRef<HTMLDivElement, {
     const initial = sanitizeRichText(value ?? defaultValue ?? '');
     replaceContent(el, initial);
     lastEmittedRef.current = initial;
+    if (autoFocus) {
+      el.focus();
+      // Place the caret at the very end of the seeded content.
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

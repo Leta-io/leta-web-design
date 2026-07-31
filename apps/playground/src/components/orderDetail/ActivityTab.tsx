@@ -7,7 +7,6 @@ import {
   Badge,
   Button,
   FeaturedIcon,
-  FooterFrame,
   NotificationBanner,
   TextArea,
   TopFilterSection,
@@ -143,10 +142,12 @@ function CommentBlock({ block, bare, onEdit }: { block: Extract<ActivityBodyBloc
 
 /**
  * Inline comment editor — the Figma "Dispatcher Comment (Editing)" state
- * (`1685:119878`), shown after the user clicks Edit on their OWN comment. Replaces
- * the comment card + edit section with a Rich Data Entry (State=Active, pre-filled,
- * **Send hidden** — formatting toggles only) stacked (gap 8) above a Card Footer
- * carrying Cancel (Secondary) + Save (Primary), right-aligned.
+ * (`1685:119878`, updated 2026-07-31), shown after the user clicks Edit on their
+ * OWN comment. The comment card + edit section is replaced by a Rich Data Entry
+ * (State=Active, pre-filled, auto-focused) whose footer carries the formatting
+ * toggles on the left and **Cancel (Secondary) + Save (Primary), both Small** in
+ * the trailing slot — the DS `TextArea variant="rich"` default. (The prior
+ * separate Card Footer was removed by the designer.)
  */
 function CommentEditor({
   initialHtml,
@@ -160,24 +161,19 @@ function CommentEditor({
   const [html, setHtml] = React.useState(initialHtml);
   const canSave = htmlToPlainText(html).trim().length > 0;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', width: '100%' }}>
-      {/* Inline-edit case — the Save/Cancel actions live in the Card Footer
-          below, so we render the rich field with an empty trailing slot. */}
-      <TextArea
-        variant="rich"
-        showLabel={false}
-        showHelper={false}
-        showCounter={false}
-        trailing={null}
-        value={html}
-        onChange={setHtml}
-        style={{ width: '100%' }}
-      />
-      <FooterFrame variant="card">
-        <Button variant="secondary" size="medium" onClick={onCancel}>Cancel</Button>
-        <Button variant="primary" size="medium" disabled={!canSave} onClick={() => canSave && onSave(html)}>Save</Button>
-      </FooterFrame>
-    </div>
+    <TextArea
+      variant="rich"
+      showLabel={false}
+      showHelper={false}
+      showCounter={false}
+      autoFocus
+      value={html}
+      onChange={setHtml}
+      onCancel={onCancel}
+      onSave={() => canSave && onSave(html)}
+      saveDisabled={!canSave}
+      style={{ width: '100%' }}
+    />
   );
 }
 
@@ -452,9 +448,8 @@ export function ActivityTimeline({
  * the header divider, which is full-bleed). So the border is drawn on an inner
  * element within the 16px inset rather than on the full-width root.
  *
- * Spacing: `Container` gap 20 (divider → content), `Main Body` pad-bottom 8
- * (the designer tightened the Activity-tab Main Body to `[24,16,8,16]` — the
- * composer's own bottom breathing room is now 8px).
+ * Spacing: `Container` gap 20 (divider → content), `Main Body` pad-bottom 24
+ * (the designer reverted the Activity-tab Main Body to `[24,16,24,16]`).
  */
 function BottomRegion({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
@@ -475,7 +470,7 @@ function BottomRegion({ children }: { children: React.ReactNode }): React.ReactE
           boxSizing: 'border-box',
           borderTop: 'var(--stroke-xs) solid var(--border-neutral-default)',
           paddingTop: 'var(--padding-20px)',
-          paddingBottom: 'var(--padding-8px)',
+          paddingBottom: 'var(--padding-24px)',
         }}
       >
         {children}
@@ -484,43 +479,183 @@ function BottomRegion({ children }: { children: React.ReactNode }): React.ReactE
   );
 }
 
+/* ---- Comment Field (Figma `1691:120714`) — idle ⇆ active composer ---------- */
+
+let commentStyleInjected = false;
+function ensureCommentFieldStyles(): void {
+  if (commentStyleInjected || typeof document === 'undefined') return;
+  commentStyleInjected = true;
+  const el = document.createElement('style');
+  el.setAttribute('data-leta', 'comment-field');
+  // Idle single-line field (Figma `Comment Field / Idle` — Input Field / Basic):
+  // 40px, `--surface-neutral-input-field`, 1px `--border-neutral-default`, radius
+  // 8, pad 10/12, left-aligned placeholder. A click target that expands to the
+  // rich editor — so it carries a subtle hover (border darkens) to read as one.
+  el.textContent = `
+.leta-comment-idle {
+  display: flex; align-items: center; width: 100%; height: 40px; box-sizing: border-box;
+  padding: var(--padding-10px) var(--padding-12px); text-align: left; cursor: text;
+  background: var(--surface-neutral-input-field);
+  border: var(--stroke-xs) solid var(--border-neutral-default);
+  border-radius: var(--rounding-lg);
+  color: var(--text-default-placeholder);
+  transition: border-color 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+.leta-comment-idle:hover { border-color: var(--border-neutral-hover, var(--icons-neutral-idle)); }
+.leta-comment-idle:focus-visible {
+  outline: var(--stroke-sm) solid var(--border-secondary-component-focus); outline-offset: 2px;
+}
+@keyframes leta-comment-field-in { from { opacity: 0; } to { opacity: 1; } }
+.leta-comment-active { animation: leta-comment-field-in 200ms cubic-bezier(0.2, 0, 0, 1); }
+@media (prefers-reduced-motion: reduce) { .leta-comment-active { animation: none; } }
+`;
+  document.head.appendChild(el);
+}
+
 /**
- * Fixed comment-composer section — the Figma `Comment` frame (V, gap 16): a Rich
- * Data Entry that fills the width, plus the editable-notice banner.
+ * Animates its own height when `trigger` flips, between whatever content is
+ * mounted before and after. Interruptible (a plain CSS `height` transition, per
+ * make-interfaces-feel-better — never `transition: all`); releases to `height:auto`
+ * once settled so the rich field can still grow as the user types. Honors
+ * `prefers-reduced-motion`.
  */
-export function ActivityComposerSection({ onPost }: { onPost: (html: string) => void }): React.ReactElement {
-  // `html` is sanitized rich text (bold/italic/underline/line-breaks only —
-  // see `sanitizeRichText`); emptiness is checked on visible text, not the
-  // markup string, so e.g. an empty bolded span doesn't count as content.
+function AnimatedHeight({ trigger, children }: { trigger: boolean; children: React.ReactNode }): React.ReactElement {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const prevH = React.useRef<number | null>(null);
+  const mounted = React.useRef(false);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const reduce = typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
+    el.style.height = 'auto';
+    const to = el.offsetHeight;
+    if (!mounted.current) {
+      mounted.current = true;
+      prevH.current = to;
+      el.style.overflow = 'visible';
+      return;
+    }
+    const from = prevH.current ?? to;
+    prevH.current = to;
+    if (from === to || reduce) {
+      el.style.overflow = 'visible';
+      return;
+    }
+    el.style.overflow = 'hidden';
+    el.style.height = `${from}px`;
+    void el.offsetHeight; // reflow so the transition runs from `from`
+    el.style.height = `${to}px`;
+    const onEnd = (e: TransitionEvent) => {
+      if (e.propertyName !== 'height') return;
+      el.style.height = 'auto';
+      el.style.overflow = 'visible';
+      el.removeEventListener('transitionend', onEnd);
+    };
+    el.addEventListener('transitionend', onEnd);
+    return () => el.removeEventListener('transitionend', onEnd);
+  }, [trigger]);
+  return (
+    <div ref={ref} style={{ transitionProperty: 'height', transitionDuration: '280ms', transitionTimingFunction: 'cubic-bezier(0.2, 0, 0, 1)' }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The docked comment composer (Figma `Comment Field` `1691:120714`). Two states:
+ * - **Idle**: the dispatcher's Avatar + a compact single-line "Leave a comment"
+ *   click target + the editable-window notice.
+ * - **Active**: the single-line is swapped for a Rich Text Area (auto-focused;
+ *   formatting toggles + Cancel/Save), same avatar + notice.
+ *
+ * Clicking the idle field — or the footer "Add Comment" button (via `active`) —
+ * expands to Active; **Cancel** discards + collapses, **Save** posts + collapses.
+ * The idle↔active height change animates (see {@link AnimatedHeight}).
+ */
+function CommentField({
+  active,
+  onActivate,
+  onDeactivate,
+  onPost,
+}: {
+  active: boolean;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  onPost: (html: string) => void;
+}): React.ReactElement {
+  ensureCommentFieldStyles();
+  // `html` is sanitized rich text; emptiness is measured on visible text, not the
+  // markup, so an empty bolded span doesn't count as content.
   const [html, setHtml] = React.useState('');
-  const canSave = htmlToPlainText(html).trim().length > 0;
+  const hasText = htmlToPlainText(html).trim().length > 0;
   const save = () => {
-    if (!canSave) return;
+    if (!hasText) return;
     onPost(html);
     setHtml('');
+    onDeactivate();
+  };
+  const cancel = () => {
+    setHtml('');
+    onDeactivate();
   };
   return (
+    // Avatar + Input column, gap 12 (Figma). Top-aligned so the 40px avatar sits
+    // level with the field's first line as the field grows.
+    <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%' }}>
+      <Avatar name={DISPATCHER_NAME} tone="teal" size="medium" decorative />
+      <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)' }}>
+        <AnimatedHeight trigger={active}>
+          {active ? (
+            <div className="leta-comment-active">
+              <TextArea
+                variant="rich"
+                showLabel={false}
+                showHelper={false}
+                showCounter={false}
+                autoFocus
+                placeholder="Leave a comment"
+                value={html}
+                onChange={setHtml}
+                onSave={save}
+                onCancel={cancel}
+                saveDisabled={!hasText}
+                style={{ width: '100%' }}
+              />
+            </div>
+          ) : (
+            <button type="button" className="leta-comment-idle text-label-m-regular" onClick={onActivate}>
+              Leave a comment
+            </button>
+          )}
+        </AnimatedHeight>
+        <NotificationBanner type="neutral" variant="subtle" description="Comments are editable within 5 minutes." />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Fixed comment-composer section — the Figma `Comment Field` docked at the bottom
+ * of the Activity tab's Container. Wraps {@link CommentField} in the shared
+ * {@link BottomRegion} (demarcator + insets). `active` is owned by the drawer so
+ * the footer "Add Comment" button can expand it.
+ */
+export function ActivityComposerSection({
+  active,
+  onActivate,
+  onDeactivate,
+  onPost,
+}: {
+  active: boolean;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  onPost: (html: string) => void;
+}): React.ReactElement {
+  return (
     <BottomRegion>
-      <TextArea
-        variant="rich"
-        showLabel={false}
-        showHelper={false}
-        showCounter={false}
-        placeholder="Leave a comment"
-        value={html}
-        onChange={setHtml}
-        // Trailing slot uses the DS default (Cancel + Save, both Idle per Figma).
-        // Save ships Idle by design — the composer gates empty submissions in
-        // `save()` above (also via `saveDisabled` here so the button reads
-        // disabled visually while the field has no text). Cancel clears the draft.
-        onSave={save}
-        onCancel={() => setHtml('')}
-        saveDisabled={!canSave}
-        // TextArea's root is a fixed `width: 350` by default; Figma's instance
-        // here is `szH: FILL`, so it must stretch to the region width.
-        style={{ width: '100%' }}
-      />
-      <NotificationBanner type="neutral" variant="subtle" description="Comments are editable within 5 minutes." />
+      <CommentField active={active} onActivate={onActivate} onDeactivate={onDeactivate} onPost={onPost} />
     </BottomRegion>
   );
 }

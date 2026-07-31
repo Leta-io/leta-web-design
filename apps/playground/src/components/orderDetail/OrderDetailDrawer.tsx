@@ -448,6 +448,13 @@ function DrawerBody({
     () => [...activityItems, ...localComments].reverse(),
     [activityItems, localComments],
   );
+  // Comment composer expanded/idle state. Lives here so the footer "Add Comment"
+  // button (rendered on every tab) can expand the composer, and a tab switch
+  // collapses it back to idle.
+  const [commentActive, setCommentActive] = React.useState(false);
+  React.useEffect(() => {
+    if (tab !== 1) setCommentActive(false);
+  }, [tab]);
   const isCompleted = status === 'delivered' || status === 'cancelled';
   // Items accordion: once paginated (>5 items), lock the item-rows region to the
   // full first-page (5-row) height so a short last page (e.g. 1 item) doesn't
@@ -487,7 +494,9 @@ function DrawerBody({
       case 'dispatch': return actions.dispatch(order.id);
       case 'updateStatus': return actions.requestUpdateStatus([order.id]);
       case 'reschedule': return actions.requestReschedule([order.id]);
-      case 'addComment': return actions.stub('Add Comment');
+      // Add Comment (footer, every tab) is a shortcut to commenting: switch to the
+      // Activity tab and expand the composer (auto-focused). Not a stub anymore.
+      case 'addComment': setTab(1); setCommentActive(true); return;
     }
   };
 
@@ -935,7 +944,12 @@ function DrawerBody({
                 <ActivityTerminalNotice />
               ) : (
                 <>
-                  <ActivityComposerSection onPost={handleCommentPost} />
+                  <ActivityComposerSection
+                    active={commentActive}
+                    onActivate={() => setCommentActive(true)}
+                    onDeactivate={() => setCommentActive(false)}
+                    onPost={handleCommentPost}
+                  />
                   {hasFooter && (
                     <FooterFrame
                       variant="tertiary-action"
