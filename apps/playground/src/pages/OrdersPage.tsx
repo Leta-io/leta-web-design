@@ -451,6 +451,14 @@ export function OrdersPage(): React.ReactElement {
   // Order Detail drawer (OM §7 / wireframes 320:99590) — opened by clicking a
   // table row (§3.1) or the "Order created" toast's View Order CTA.
   const [viewOrderId, setViewOrderId] = React.useState<string | null>(null);
+  // When an "Add Comment" entry point opens the drawer, this holds that order id so
+  // the drawer opens straight into the Activity tab with the composer expanded.
+  // Cleared on close (and never matches a plain row-click open of the same order).
+  const [commentIntentOrderId, setCommentIntentOrderId] = React.useState<string | null>(null);
+  const openOrderForComment = React.useCallback((id: string) => {
+    setViewOrderId(id);
+    setCommentIntentOrderId(id);
+  }, []);
   // Externally-driven drawer skeleton (§9) — set briefly whenever an action's
   // outcome keeps the View Order drawer open, so the refreshed data reads as
   // "just fetched" rather than silently swapping in place.
@@ -1444,6 +1452,7 @@ export function OrdersPage(): React.ReactElement {
           onRequestEdit={requestEdit}
           onAddToTrip={addToTrip}
           onChangeDriver={changeDriver}
+          onAddComment={openOrderForComment}
         />
       )}
 
@@ -1452,7 +1461,8 @@ export function OrdersPage(): React.ReactElement {
           route to the same modal handlers as the table's row ⋯ menu. */}
       <OrderDetailDrawer
         orderId={viewOrderId}
-        onClose={() => setViewOrderId(null)}
+        commentIntent={viewOrderId != null && commentIntentOrderId === viewOrderId}
+        onClose={() => { setViewOrderId(null); setCommentIntentOrderId(null); }}
         loading={drawerLoading}
         actions={{
           dispatch: dispatchOrder,
@@ -1564,9 +1574,12 @@ interface OverlayHostProps {
   /** Add To Trip / Change Driver for a single order (row ⋯ menu). */
   onAddToTrip: (orderId: string) => void;
   onChangeDriver: (orderId: string) => void;
+  /** Add Comment (row ⋯ menu) — opens the order drawer on the Activity tab with
+   *  the comment composer expanded. */
+  onAddComment: (orderId: string) => void;
 }
 
-function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, onPickStatus, countByStatus, selectedOrderList, deselect, onCreatedLabel, extraCols, onToggleColumn, filterGroups, appliedFilters, filterPreviewCount, onFilterSelectionChange, onFilterApply, onFilterReset, onImport, onSortChange, rowsPerPage, onRowsPerPage, onRequestUpdateStatus, onRequestReschedule, onRequestEdit, onAddToTrip, onChangeDriver }: OverlayHostProps): React.ReactElement {
+function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, onPickStatus, countByStatus, selectedOrderList, deselect, onCreatedLabel, extraCols, onToggleColumn, filterGroups, appliedFilters, filterPreviewCount, onFilterSelectionChange, onFilterApply, onFilterReset, onImport, onSortChange, rowsPerPage, onRowsPerPage, onRequestUpdateStatus, onRequestReschedule, onRequestEdit, onAddToTrip, onChangeDriver, onAddComment }: OverlayHostProps): React.ReactElement {
   const { kind, anchor, orderId, orderStatus, group } = overlay;
 
   if (kind === 'rowsPerPage') {
@@ -1756,6 +1769,7 @@ function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, 
                     else if (a.label === 'Edit Order') onRequestEdit(orderId);
                     else if (a.label === 'Add To Trip') onAddToTrip(orderId);
                     else if (a.label === 'Change Driver') onChangeDriver(orderId);
+                    else if (a.label === 'Add Comment') onAddComment(orderId);
                     else pushToast({ type: 'success', title: a.label, subtitle: 'This action is coming soon.' });
                   }}
                 />

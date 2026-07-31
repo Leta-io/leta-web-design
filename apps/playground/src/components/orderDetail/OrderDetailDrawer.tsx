@@ -285,6 +285,7 @@ export function OrderDetailDrawer({
   onClose,
   actions,
   loading = false,
+  commentIntent = false,
 }: {
   /** The order to show; null renders nothing. */
   orderId: string | null;
@@ -295,6 +296,10 @@ export function OrderDetailDrawer({
    *  rather than silently swapping in place. The drawer also shows its own
    *  brief skeleton on first open for a given order, independent of this. */
   loading?: boolean;
+  /** Open straight into the Activity tab with the comment composer expanded &
+   *  focused (used by the "Add Comment" entry points). Consumed once per order,
+   *  when the drawer opens (DrawerBody remounts per order id). */
+  commentIntent?: boolean;
 }): React.ReactElement | null {
   const orders = useStore((s) => s.orders);
   const getDriver = useStore((s) => s.getDriver);
@@ -320,14 +325,13 @@ export function OrderDetailDrawer({
     setTimeout(onClose, 220);
   };
 
-  // Tab state resets per order.
-  const [tab, setTab] = React.useState(0);
-  React.useEffect(() => setTab(0), [orderId]);
-
   if (!order) return null;
 
   return (
     <DrawerBody
+      // Keyed by order id: DrawerBody remounts per order, so its tab + composer
+      // state re-initialize from `commentIntent` on each open (no reset effect
+      // needed).
       key={order.id}
       order={order}
       driverId={order.driverId}
@@ -335,8 +339,7 @@ export function OrderDetailDrawer({
       configKey={config}
       entered={entered}
       closing={closing}
-      tab={tab}
-      setTab={setTab}
+      commentIntent={commentIntent}
       onClose={close}
       actions={actions}
       loading={loading}
@@ -351,8 +354,7 @@ function DrawerBody({
   configKey: config,
   entered,
   closing,
-  tab,
-  setTab,
+  commentIntent = false,
   onClose,
   actions,
   loading,
@@ -363,12 +365,15 @@ function DrawerBody({
   configKey: ClientConfig;
   entered: boolean;
   closing: boolean;
-  tab: number;
-  setTab: (i: number) => void;
+  commentIntent?: boolean;
   onClose: () => void;
   actions: OrderDetailActions;
   loading: boolean;
 }): React.ReactElement {
+  // Tab + composer state live here (DrawerBody remounts per order via the
+  // `key={order.id}`), so both initialize from `commentIntent`: an Add-Comment
+  // open lands on the Activity tab (index 1) with the composer already expanded.
+  const [tab, setTab] = React.useState(commentIntent ? 1 : 0);
   // Brief skeleton on first open for this order (remounts via the `key={order.id}`
   // above, so this resets per order) — independent of the externally-driven
   // `loading` prop (action-triggered refresh while staying open).
@@ -451,8 +456,9 @@ function DrawerBody({
   );
   // Comment composer expanded/idle state. Lives here so the footer "Add Comment"
   // button (rendered on every tab) can expand the composer, and a tab switch
-  // collapses it back to idle.
-  const [commentActive, setCommentActive] = React.useState(false);
+  // collapses it back to idle. Seeded from `commentIntent` so an Add-Comment open
+  // starts expanded.
+  const [commentActive, setCommentActive] = React.useState(commentIntent);
   React.useEffect(() => {
     if (tab !== 1) setCommentActive(false);
   }, [tab]);
