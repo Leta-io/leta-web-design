@@ -1,6 +1,7 @@
 import type { AvatarTone } from '@leta/components';
 import type { IconName } from '@leta/icons';
 import type { ClientConfig, OrderStatus } from '../../store/types.js';
+import { CURRENT_USER } from '../../store/currentUser.js';
 import { formatDateTime, idHash } from '../../lib/orderMeta.js';
 import type { OrderDetailModel } from './detailModel.js';
 
@@ -14,10 +15,28 @@ import type { OrderDetailModel } from './detailModel.js';
  * of its 20 variants; see `design-parity/activity-entry-inventory.md`.
  */
 
-// The logged-in dispatcher persona — "Alvin Simuiki" is the interactive
-// playground's user (TopBar / UserMenu), so every dispatcher action in the
-// activity trail and overview tab attributes to them.
-export const DISPATCHER_NAME = 'Alvin Simuiki';
+// The logged-in dispatcher persona (single source of truth: `CURRENT_USER`), so
+// every dispatcher action in the activity trail attributes to the same identity
+// shown in the TopBar / User Menu / comment composer — and carries that user's
+// avatar (their `tone` monogram, or their uploaded photo when set).
+export const DISPATCHER_NAME = CURRENT_USER.name;
+
+/** The dispatcher's own leading avatar — the user's photo (if uploaded) or their
+ *  tone monogram. Used for every "me"-attributed timeline entry. */
+const dispatcherLeading = (): ActivityLeading => ({
+  kind: 'avatar',
+  name: CURRENT_USER.name,
+  tone: CURRENT_USER.tone,
+  src: CURRENT_USER.avatarSrc,
+});
+
+/** The dispatcher as a mid-sentence actor (avatar + bold name). */
+const dispatcherActor = (): TitleSegment => ({
+  kind: 'actor',
+  name: CURRENT_USER.name,
+  tone: CURRENT_USER.tone,
+  src: CURRENT_USER.avatarSrc,
+});
 
 /** One inline segment of an activity row's rich title. */
 export type TitleSegment =
@@ -180,7 +199,7 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
             { kind: 'text', text: 'Order dispatched to' },
             { kind: 'actor', name: driverName, tone: driverTone },
             { kind: 'text', text: 'by' },
-            { kind: 'actor', name: DISPATCHER_NAME },
+            dispatcherActor(),
           ],
           timestamp: at,
           blocks: [{ kind: 'status', icon: 'Order-Status', lead: 'Order status changed from', from, to }],
@@ -192,7 +211,7 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
         const prevDriver = MOCK_PREVIOUS_DRIVERS[h % MOCK_PREVIOUS_DRIVERS.length]!;
         items.push({
           id: 'change-driver',
-          leading: { kind: 'avatar', name: DISPATCHER_NAME },
+          leading: dispatcherLeading(),
           title: [
             { kind: 'name', text: DISPATCHER_NAME },
             { kind: 'text', text: 'reassigned the order to' },
@@ -263,7 +282,7 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
       if (h % 5 === 3) {
         items.push({
           id: 'dispatcher-comment',
-          leading: { kind: 'avatar', name: DISPATCHER_NAME },
+          leading: dispatcherLeading(),
           title: [{ kind: 'name', text: DISPATCHER_NAME }, { kind: 'text', text: 'left a comment' }],
           timestamp: bump(2),
           blocks: [{ kind: 'comment', text: MOCK_DISPATCHER_COMMENTS[h % MOCK_DISPATCHER_COMMENTS.length]!, edits: h % 2 === 0 ? 2 : undefined, editable: false }],
@@ -308,7 +327,7 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
   if (offPath === 'cancelled') {
     items.push({
       id: 'cancelled',
-      leading: { kind: 'avatar', name: DISPATCHER_NAME },
+      leading: dispatcherLeading(),
       title: [{ kind: 'name', text: DISPATCHER_NAME }, { kind: 'text', text: 'cancelled the order' }],
       timestamp: bump(5 + (h % 20)),
       blocks: [

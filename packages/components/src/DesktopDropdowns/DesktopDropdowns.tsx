@@ -5,7 +5,7 @@ import { Button } from '../Button/Button.js';
 import { SearchInput } from '../SearchInput/SearchInput.js';
 import { EmptyState } from '../EmptyState/EmptyState.js';
 import { NotificationBanner } from '../NotificationBanner/NotificationBanner.js';
-import { Avatar } from '../Avatar/Avatar.js';
+import { Avatar, type AvatarTone } from '../Avatar/Avatar.js';
 import { FooterFrame } from '../FooterFrame/FooterFrame.js';
 
 /**
@@ -112,6 +112,10 @@ export interface DesktopDropdownsProps
   userName?: string;
   /** User Menu email shown under the name. */
   userEmail?: string;
+  /** User Menu avatar monogram tone (used when there is no uploaded photo). Default `teal`. */
+  userTone?: AvatarTone;
+  /** User Menu avatar photo URL. When set, shown in place of the monogram. */
+  userAvatarSrc?: string;
   /**
    * Sort fields + per-field direction labels (Figma `1050:209224`). The selected
    * field's `ascLabel`/`descLabel` drive the two direction rows — e.g. a date field
@@ -300,6 +304,8 @@ export const DesktopDropdowns = React.forwardRef<HTMLDivElement, DesktopDropdown
     emptyDescription,
     userName = 'Ify Kiplimo',
     userEmail = 'ifykiplimo@gmail.com',
+    userTone = 'teal',
+    userAvatarSrc,
     sortOptions = DEFAULT_SORT_OPTIONS,
     onSortChange,
     onSelectionChange,
@@ -477,7 +483,7 @@ export const DesktopDropdowns = React.forwardRef<HTMLDivElement, DesktopDropdown
           <>
             <div style={{ padding: 'var(--padding-8px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)', padding: 'var(--padding-10px)' }}>
-                <Avatar name={userName} size="small" tone="teal" />
+                <Avatar name={userName} src={userAvatarSrc} size="small" tone={userTone} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4px)', minWidth: 0 }}>
                   <span className="text-label-l-semibold" style={{ color: 'var(--text-default-heading)', whiteSpace: 'nowrap' }}>{userName}</span>
                   <span className="text-label-s-regular" style={{ color: 'var(--text-default-sub-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userEmail}</span>

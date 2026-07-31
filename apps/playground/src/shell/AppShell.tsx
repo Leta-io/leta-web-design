@@ -11,6 +11,7 @@ import {
   type BreadcrumbCrumb,
 } from '@leta/components';
 import { useStore } from '../store/useStore.js';
+import { CURRENT_USER } from '../store/currentUser.js';
 import { UserMenuDropdown } from '../components/UserMenuDropdown.js';
 import { ClientSwitcherDropdown } from '../components/ClientSwitcherDropdown.js';
 
@@ -278,7 +279,7 @@ export function AppShell(): React.ReactElement {
                 current={crumbCurrent}
               />
             }
-            user={{ name: 'Alvin Simuiki', tone: 'teal' }}
+            user={{ name: CURRENT_USER.name, tone: CURRENT_USER.tone, avatarSrc: CURRENT_USER.avatarSrc }}
             onNotificationsClick={() => {}}
             onUserMenuClick={handleUserMenuClick}
           />

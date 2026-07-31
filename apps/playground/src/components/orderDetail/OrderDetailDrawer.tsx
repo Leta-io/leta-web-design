@@ -29,6 +29,7 @@ import type { ClientConfig, Driver, Order, OrderStatus } from '../../store/types
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
 import { Popover, MenuPanel, MenuDivider } from '../Popover.js';
 import { buildActivityTrail, DISPATCHER_NAME, type ActivityItem } from './activityModel.js';
+import { CURRENT_USER } from '../../store/currentUser.js';
 import { ActivityTimeline, ActivityComposerSection, ActivityTerminalNotice } from './ActivityTab.js';
 import { buildOrderDetail, type OrderDetailModel, type ProofFile } from './detailModel.js';
 import { ExpandedMapOverlay } from './OrderDetailMap.js';
@@ -424,7 +425,7 @@ function DrawerBody({
       ...prev,
       {
         id: `local-comment-${localCommentSeq.current}`,
-        leading: { kind: 'avatar', name: DISPATCHER_NAME },
+        leading: { kind: 'avatar', name: CURRENT_USER.name, tone: CURRENT_USER.tone, src: CURRENT_USER.avatarSrc },
         title: [{ kind: 'name', text: DISPATCHER_NAME }, { kind: 'text', text: 'left a comment' }],
         timestamp: new Date(),
         blocks: [{ kind: 'comment', text: html, editable: true, edits: 0 }],

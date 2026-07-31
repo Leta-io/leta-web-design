@@ -15,7 +15,8 @@ import {
 } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
-import { activityTimestamp, DISPATCHER_NAME, type ActivityBodyBlock, type ActivityItem, type TitleSegment } from './activityModel.js';
+import { activityTimestamp, type ActivityBodyBlock, type ActivityItem, type TitleSegment } from './activityModel.js';
+import { CURRENT_USER } from '../../store/currentUser.js';
 import type { ProofFile } from './detailModel.js';
 import { renderRichText } from '../../lib/richText.js';
 
@@ -604,7 +605,9 @@ function CommentField({
     // Avatar + Input column, gap 12 (Figma). Top-aligned so the 40px avatar sits
     // level with the field's first line as the field grows.
     <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%' }}>
-      <Avatar name={DISPATCHER_NAME} tone="teal" size="medium" decorative />
+      {/* The signed-in user's avatar — their uploaded photo if set, otherwise their
+          tone monogram (same identity + styling as the TopBar / User Menu avatar). */}
+      <Avatar name={CURRENT_USER.name} src={CURRENT_USER.avatarSrc} tone={CURRENT_USER.tone} size="medium" decorative />
       <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)' }}>
         <AnimatedHeight trigger={active}>
           {active ? (

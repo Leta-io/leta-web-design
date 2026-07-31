@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { DesktopDropdowns } from '@leta/components';
 import { useStore } from '../store/useStore.js';
+import { CURRENT_USER } from '../store/currentUser.js';
 import { Popover } from './Popover.js';
 
 interface UserMenuDropdownProps {
@@ -28,7 +29,7 @@ export function UserMenuDropdown({ anchorRect, onClose }: UserMenuDropdownProps)
     const row = (e.target as HTMLElement).closest('[role="menuitem"], button, [data-row]');
     const label = (row?.textContent ?? '').trim();
     if (/log\s*out/i.test(label)) {
-      pushToast({ type: 'success', title: 'Logged out', subtitle: 'See you next time, Alvin!' });
+      pushToast({ type: 'success', title: 'Logged out', subtitle: `See you next time, ${CURRENT_USER.name.split(' ')[0]}!` });
     } else if (label) {
       pushToast({ type: 'success', title: label, subtitle: 'This feature is in progress.' });
     }
@@ -40,8 +41,10 @@ export function UserMenuDropdown({ anchorRect, onClose }: UserMenuDropdownProps)
       <div onClick={handleRowClick}>
         <DesktopDropdowns
           variant="user-menu"
-          userName="Alvin Simuiki"
-          userEmail="alvinsumuki@gmail.com"
+          userName={CURRENT_USER.name}
+          userEmail={CURRENT_USER.email}
+          userTone={CURRENT_USER.tone}
+          userAvatarSrc={CURRENT_USER.avatarSrc}
         />
       </div>
     </Popover>
