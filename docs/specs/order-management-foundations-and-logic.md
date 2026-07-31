@@ -8,7 +8,7 @@
 > **Companion design spec:** Table Column Layout Specification (owns column widths, floors, truncation, responsive behaviour)
 > **Audience:** implementation agent + engineers
 > **Status:** Ready for build — domain logic (Parts 1–11) and orders-surface interaction (Part 12); generic component behaviour in Doc 3
-> **Version:** 3.0 — adds §7.2.1 Route line styling (planned vs driven route semantics, colours, animation, non-overlap rule) and the expanded-map chrome components/banner matrix, reconciled against wireframes `1522:115768` on 2026-07-27.
+> **Version:** 3.1 — clarifies that **fleet / company type (`dispatch.fleetType`) is platform-provisioned** (set by LETA internal admin from the master account, read-only to the tenant), not a tenant-admin toggle; adds the LETA internal admin actor + the two-configuration-tier distinction (§2.2), and threads it through §7.5 / §9 / Appendix A. (3.0 — adds §7.2.1 Route line styling and the expanded-map chrome components/banner matrix, reconciled against wireframes `1522:115768` on 2026-07-27.)
 
 ---
 
@@ -51,10 +51,13 @@ This document defines how orders are represented, created, edited, dispatched, r
 
 | Actor | Role in Order Management |
 |---|---|
+| **LETA internal admin** (master account) | **Provisions the tenant** from the LETA master account — sets platform-tier account attributes the tenant cannot change, notably the **fleet / company type** (`dispatch.fleetType`: SaaS-managed-fleet vs marketplace). Fixed at onboarding; **read-only to the tenant Admin** and never surfaced as an editable control in the tenant Administration section. |
 | Dispatcher | Creates, edits, dispatches, reassigns, and closes orders |
-| Admin | Sets configuration (Doc 2); has the Administration section |
+| Admin (tenant) | Sets **tenant** configuration (Doc 2) — items, payment, auto-broadcast, returns, etc.; has the Administration section. **Cannot** change platform-provisioned attributes (e.g. fleet type). |
 | Driver | Receives, carries, delivers; may initiate returns where enabled |
 | Recipient | Receives the delivery; sees a tracking link (out of scope here) |
+
+> **Two configuration tiers.** Behaviour is governed by settings from **two distinct sources**: (1) **platform-provisioned account attributes** set by LETA internal admin from the master account — fixed for the tenant, read-only (currently `dispatch.fleetType`); and (2) **tenant-admin configuration** — the toggles the Admin role controls (Doc 2). A flag being "client-level" (its *scope*) does not make it tenant-editable (its *source*); fleet type is client-level in scope **but** platform-set in source. Tenant Settings/Administration surfaces must render tier-1 attributes read-only (or not at all), never as editable controls.
 
 ### 2.3 Status glossary
 
@@ -361,6 +364,8 @@ Shows how the order reached (or is reaching) drivers. Content differs by company
 - **Not yet broadcast** (unassigned, no broadcast sent): empty state.
 - **Manually dispatched orders:** a centred information card explaining the order was dispatched manually (no broadcast occurred).
 
+> **Company type is platform-set, not a tenant choice.** The SaaS/managed-fleet vs marketplace split above is the **`dispatch.fleetType`** account attribute — **provisioned by LETA internal admin from the master account** and fixed at onboarding, read-only to the tenant (§2.2, Appendix A). Neither the dispatcher nor the tenant Admin can toggle it; it only *selects which shape* an order's broadcast detail takes (driver-level detail vs reach/response-rate). The **dispatch path** (broadcast vs manual), by contrast, is tenant-/dispatcher-driven (§9). So the tab's content is a function of `(dispatch.fleetType [platform], dispatch path [tenant], order status)`.
+
 > Visual reference (Figma): [Dispatch Logs tab](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=384-106688). This tab was specced in depth in the dashboard redesign work.
 
 ---
@@ -381,6 +386,7 @@ What a dispatcher can change depends on physical custody. Editing does **not** t
 
 ## 9. Broadcast & Manual Dispatch Visibility
 
+- **Company / fleet type is platform-provisioned, not a dispatch choice.** Whether a tenant is **SaaS / managed-fleet** or **marketplace** is set by **LETA internal admin from the master account** (`dispatch.fleetType`, fixed at onboarding, read-only to the tenant — §2.2, Appendix A). It governs *how* a broadcast reaches drivers and *how* the Dispatch Logs tab (§7.5) presents it. It is **not** something the dispatcher or tenant Admin selects — per order or in settings.
 - **Broadcast** is the automatic path: an order is offered to eligible drivers (SaaS managed-fleet or marketplace), producing the Broadcasted status and the Dispatch Logs tab detail in §7.5.
 - **Manual dispatch** is the dispatcher-driven path: the dispatcher selects a driver directly. Manually dispatched orders show the centred information card in the Dispatch Logs tab rather than broadcast metrics.
 - The manual dispatch flow is a **centred modal** with a two-step progression — **Select Driver → Preview Route** — combining a driver list with a live map and an optimised route preview. (Full manual-dispatch modal spec is tracked separately; referenced here as the origin of the manual-dispatch order state.)
@@ -681,13 +687,15 @@ Fully defined in **Configuration Reference (Doc 2)** — no longer TBD. Named he
 | `items.valueRequired` | Whether an items value is mandatory |
 | `payment.enabled` | Whether the Payment section appears |
 | `dispatch.enRoutePickup.enabled` | En-route pickup extension of Add to Trip (client-level, off by default) |
-| `dispatch.fleetType` | Marketplace vs. managed-fleet — client-level, fixed at onboarding |
+| `dispatch.fleetType` | Marketplace vs. managed-fleet. **Platform-provisioned — set by LETA internal admin from the master account, fixed at onboarding, read-only to the tenant Admin** (not a tenant Administration toggle, despite being named alongside them here — see the tier note below and §2.2) |
 | `scheduling.autoBroadcast.enabled` | Whether Scheduled orders auto-transition to Broadcasted at T−1h (else → Pending). Client-level |
 | `dispatch.orderWaitTime` | How long a non-scheduled order stays Pending before auto-broadcast (auto-broadcast clients; drives the §7.2 row-2b countdown). Client-level |
 | `pickup.confirmation.enabled` | Pickup PIN + Proof of Pickup requirement. Client-level only, no depot override |
 | `delivery.pod.signature.enabled` / `delivery.pod.photo.enabled` | Independent proof-of-delivery toggles |
 | `returns.driverInitiated.enabled` | Whether drivers can start a return from the Driver App |
 | `returns.compensation.model` | `none` / `fixed` / `percentage` |
+
+> **Configuration tier note.** Most flags in this table are **tenant-admin toggles** (the Admin role sets them; Doc 2 is authoritative). **`dispatch.fleetType` is not one of them** — it is a **platform-provisioned account attribute** set by LETA internal admin from the master account and read-only to the tenant (§2.2). It is listed here only because order-management behaviour depends on it; it must **not** appear as an editable control in any tenant Settings/Administration surface, and **Doc 2 must scope it as platform-provisioned, not a tenant toggle.**
 
 Broadcast/fleet mechanics (priority groups, acceptance windows, driver broadcast suspension) are in **Doc 5 — Broadcast & Fleet Configuration**, not restated here.
 
@@ -702,6 +710,7 @@ Broadcast/fleet mechanics (priority groups, acceptance windows, driver broadcast
 
 | Version | Date | Changes |
 |---|---|---|
+| 3.1 | Jul 2026 | **Fleet / company type (`dispatch.fleetType`) clarified as platform-provisioned, not a tenant-admin toggle** (ruled 2026-07-31): it is set by **LETA internal admin from the master account**, fixed at onboarding, **read-only to the tenant Admin**. §2.2 gains the **LETA internal admin** actor and a **two-configuration-tier** distinction (platform-provisioned account attributes vs tenant-admin toggles; *scope* "client-level" ≠ *source* "tenant-editable"). Threaded through §7.5 (Dispatch Logs content = `(fleetType [platform], dispatch path [tenant], status)`), §9 (fleet type not a dispatch choice), and Appendix A (flag line + tier note; **Doc 2 must scope it as platform-provisioned, never a tenant Settings control**). |
 | 2.9 | Jul 2026 | **§7.2 summary-card matrix rows 1–3 corrected against the View Order wireframes** (`320:99590`, ruled 2026-07-20): a Pending order never carries a scheduled date — on auto-broadcast clients a Scheduled order goes straight to Broadcasted at T−1h, never through Pending; what holds a non-scheduled order in Pending is the **order wait time** (`dispatch.orderWaitTime`, new Appendix-A flag), whose countdown renders as new row 2b "Order broadcasting soon" / "{N} minutes to broadcast."; the old "row 2 applies to any pre-broadcast order" note withdrawn. Header status icons documented as mirroring the table's Order-ID cell icons + tooltips. Expanded-map nudge copy corrected to "Dispatch now to generate a delivery route." + driver-progress banner variant noted. Est-delivery/Delivered/Cancelled sub-copy trailing periods dropped (wireframe) |
 | 2.8 | Jul 2026 | **Update Status scoped out of Returned and Returning** (Ruled 2026-07-20) — per-order and bulk. §10.1 gains an explicit Update-Status availability ruling + AGENT flag (both options invalid for these states: Mark as Delivered contradicts a not-delivered order; Mark as Pending would erase failed-attempt history Returned preserves); it stays valid elsewhere (In Transit/Arrived → Mark as Delivered for offline reconciliation; failed pickup → Mark as Pending). §12.6 modal table moves **Returned** into the no-Update-Status row (a §1.9 carry-over corrected) alongside Returning + adds the reasoning/AGENT flag. §12.5 table overflow and §12.7 drawer-footer overflow drop Update Status from the **Returned** menus (Returning already had none). §12.9 — the selection toolbar must not offer Update Status when the selection is Returned/Returning; Bulk Reschedule lives in the "more" (⋯) overflow. |
 | 2.7 | Jul 2026 | **Bulk cancel & bulk reschedule brought into V1 scope** (DES-254), removing the stale §11.5 out-of-scope line. §11.1 — bulk cancel applies one reason code to the batch; mandatory confirmation for single + bulk; reason list updated to the wireframe copy (Customer requested it / Payment Issue / Items unavailable / Customer unreachable / Other). §11.2 — bulk in scope; the driver-held consequence is an inline warning banner ("Please note that rescheduling will unassign orders from their current drivers.", supersedes the named-driver string), shown only when ≥1 selected order is Assigned/At Depot. New **§11.2.1** — Reschedule modal detail: manual-field default + suggestion-chip base-time tables, the no-op confirm-button rule, count-led CTA + toast. CTA copy standard "Action {n} Orders" / singular "Action Order" applied to Cancel/Reschedule/Update; Update Status confirm relabelled "Update {n} Orders"/"Update Order" (was "Update Status") with the toast naming the target status. Source: Changelog_Bulk_Actions_and_Reschedule_Suggestions.md |
