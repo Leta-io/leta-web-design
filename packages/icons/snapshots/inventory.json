@@ -2167,6 +2167,24 @@
       "id": "3159:27013",
       "glyph": "note-stack-add-rounded",
       "raw": "material-symbols:note-stack-add-rounded"
+    },
+    {
+      "name": "Icon/Signal-3-Bars",
+      "id": "10922:25206",
+      "glyph": "signal-cellular-alt-outline-rounded",
+      "raw": "material-symbols:signal-cellular-alt-outline-rounded"
+    },
+    {
+      "name": "Icon/Signal-2-Bars",
+      "id": "10922:25207",
+      "glyph": "signal-cellular-alt-2-bar-outline-rounded",
+      "raw": "material-symbols:signal-cellular-alt-2-bar-outline-rounded"
+    },
+    {
+      "name": "Icon/Signal-1-Bar",
+      "id": "10922:25208",
+      "glyph": "signal-cellular-alt-1-bar-outline-rounded",
+      "raw": "material-symbols:signal-cellular-alt-1-bar-outline-rounded"
     }
   ],
   "componentSets": [
