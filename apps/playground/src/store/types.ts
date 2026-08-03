@@ -60,6 +60,13 @@ export interface Order {
   /** ISO datetime string (e.g. "2026-06-29T07:30:00") — used for the live duration timer. */
   createdAt: string;
   priority: OrderPriority;
+  /**
+   * Fixture override for the Dispatch Logs shape (OM §7.5). Seeded mock orders
+   * declare this so all seven states are reachable for review; orders created live
+   * in-session leave it unset and have their state derived from
+   * (fleetType, depot broadcast config, status, provenance).
+   */
+  broadcastState?: BroadcastState;
   /** Cancellation reason codes captured by the Cancel Order modal (OM §11.1). */
   cancelReasons?: string[];
   /** Optional free-text cancellation note (required when "Other" is a reason). */
@@ -78,12 +85,58 @@ export interface Driver {
   currentOrderId: string | null;
 }
 
+/**
+ * A priority driver group assigned to a depot (OM §9). Groups are created and
+ * managed by SaaS-company admins as part of the fleet-management capability, then
+ * assigned to depots with a prioritisation order — P1 receives a broadcast first,
+ * then P2, then P3, and so on.
+ */
+export interface DriverGroup {
+  /** Priority rank — 1 = P1 (first to receive the broadcast). */
+  priority: number;
+  /** Group name as the admin named it (e.g. "In-house", "Suppliers", "Floaters"). */
+  name: string;
+  /** Seconds this group has to accept before the broadcast escalates to the next. */
+  acceptanceWindowSeconds: number;
+  maxOrders: number;
+  totalDrivers: number;
+  retries: number;
+}
+
+/**
+ * Per-depot broadcast configuration (OM §9, tenant-admin tier).
+ *
+ * **Scoped to the depot, not the client** — not every client is a SaaS/managed-fleet
+ * tenant, and not every SaaS tenant configures broadcasting for all of its depots.
+ * A depot with no `broadcast` config never auto-broadcasts; its orders are dispatched
+ * manually.
+ *
+ * A **broadcast sequence** = `rounds` typical rounds, then (if `fallbackEnabled`) one
+ * fallback round. A typical round broadcasts to each {@link DriverGroup} in priority
+ * order; round 1 only may be led by a pre-offer broadcast (`preOfferEnabled`) to
+ * drivers the routing algorithm found on a compatible route — pre-offer is not a
+ * group, and never repeats on later rounds. If the whole sequence goes unaccepted the
+ * dispatcher can re-broadcast (restarting the sequence) or dispatch manually.
+ */
+export interface DepotBroadcastConfig {
+  /** Typical rounds in one sequence, before any fallback round. */
+  rounds: number;
+  /** Whether a fallback round (all drivers near the depot, group-agnostic) closes the sequence. */
+  fallbackEnabled: boolean;
+  /** Whether a pre-offer broadcast leads round 1 (round 1 only). */
+  preOfferEnabled: boolean;
+  /** Priority driver groups assigned to this depot, in priority order (P1 first). */
+  groups: DriverGroup[];
+}
+
 /** A pickup depot the client operates. */
 export interface DepotOption {
   id: string;
   name: string;
   /** Street address, shown as the single-depot field's helper line. */
   address: string;
+  /** Broadcast configuration — absent when this depot doesn't auto-broadcast. */
+  broadcast?: DepotBroadcastConfig;
 }
 
 /** A product in the client's Products module catalogue (product-mode Items). */
@@ -128,6 +181,46 @@ export interface ClientConfig {
 }
 
 /**
+ * Fleet / company type (`dispatch.fleetType`, OM §2.2 / §9 / Appendix A).
+ *
+ * **Platform-provisioned — tier 1, NOT a tenant-admin toggle.** Set by LETA internal
+ * admin from the master account, fixed at onboarding, read-only to the tenant. It
+ * lives on the account record and deliberately NOT inside {@link ClientConfig} (which
+ * holds only the tenant-editable, Doc-2 settings), so a future tenant Settings screen
+ * can never surface it as an editable control.
+ *
+ * - `managed-fleet` — the tenant manages its own drivers, so broadcasts run through
+ *   admin-configured priority driver groups (OM §9). Dispatch Logs shows the full
+ *   round/group timeline plus the Priority Driver Groups drill-down.
+ * - `marketplace` — the tenant does not manage drivers, so there is no concept of
+ *   driver groups. Dispatch Logs collapses to a single flat log of the drivers who
+ *   saw the broadcast and responded; no rounds, no fallback, no groups drill-down.
+ */
+export type FleetType = 'managed-fleet' | 'marketplace';
+
+/**
+ * Which of the seven Dispatch Logs shapes an order's broadcast is in (OM §7.5).
+ * Lives here (not in `broadcastModel`) so seeded fixtures can declare one without a
+ * circular import.
+ *
+ * - `on-hold` — hold window still open, nothing broadcast yet (empty logs)
+ * - `broadcasting` — a priority-group or pre-offer leg is live
+ * - `completed` — a driver accepted; the sequence resolved
+ * - `fallback` — all groups passed; broadcasting to every nearby driver
+ * - `exhausted` — the whole sequence went unaccepted
+ * - `manual-before-broadcast` — dispatched by hand before any broadcast (empty logs)
+ * - `manual-after-exhausted` — dispatched by hand after the sequence failed
+ */
+export type BroadcastState =
+  | 'on-hold'
+  | 'broadcasting'
+  | 'completed'
+  | 'fallback'
+  | 'exhausted'
+  | 'manual-before-broadcast'
+  | 'manual-after-exhausted';
+
+/**
  * A client tenant. The playground represents the LETA SaaS product *for* a given
  * client (e.g. Acme Studios). The Top Bar's breadcrumb client chip switches between
  * client instances, swapping the active {@link ClientConfig}.
@@ -135,6 +228,11 @@ export interface ClientConfig {
 export interface Client {
   id: string;
   name: string;
+  /**
+   * Platform-provisioned account attribute — see {@link FleetType}. Deliberately a
+   * sibling of `config`, never a member of it: `config` is tenant-editable, this is not.
+   */
+  fleetType: FleetType;
   config: ClientConfig;
 }
 

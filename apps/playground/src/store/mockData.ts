@@ -1,4 +1,4 @@
-import type { Client, Driver, Order } from './types.js';
+import type { Client, DepotBroadcastConfig, Driver, Order } from './types.js';
 
 /**
  * Mock seed data — Nairobi (matching MapView's default center [-1.286, 36.817]).
@@ -32,22 +32,59 @@ function makeOrderId(seed: number): string {
 }
 
 /**
+ * The standard three-tier priority-group ladder an admin configures for a
+ * managed-fleet depot (OM §9): P1 in-house drivers get the longest acceptance
+ * window, then suppliers, then floaters. Reused across Acme's broadcasting depots.
+ */
+const STANDARD_BROADCAST: DepotBroadcastConfig = {
+  rounds: 2,
+  fallbackEnabled: true,
+  preOfferEnabled: true,
+  groups: [
+    { priority: 1, name: 'In-house', acceptanceWindowSeconds: 40, maxOrders: 10, totalDrivers: 7, retries: 2 },
+    { priority: 2, name: 'Suppliers', acceptanceWindowSeconds: 25, maxOrders: 10, totalDrivers: 9, retries: 1 },
+    { priority: 3, name: 'Floaters', acceptanceWindowSeconds: 25, maxOrders: 10, totalDrivers: 5, retries: 1 },
+  ],
+};
+
+/**
  * Per-client config profiles — hand-authored to demo how the platform manifests
  * differently per company (Add Order drawer, and future config-driven UI). Switch
  * via the breadcrumb client chip.
- *   • Acme Corp   — multi-depot (4) + Products module (product-mode items) + payment
- *   • Naivas Group — single depot + manual (free-text) items + payment
- *   • Java House   — single depot + items module OFF + payment OFF (minimal)
+ *   • Acme Corp    — managed-fleet · multi-depot (4) + Products module + payment.
+ *                    Two depots broadcast (full ladder + fallback + pre-offer), one
+ *                    runs a single round with no fallback, one doesn't broadcast at all.
+ *   • Naivas Group — managed-fleet · single depot with NO broadcast config (a SaaS
+ *                    tenant that dispatches manually) + manual items + payment
+ *   • Java House   — marketplace · single depot + items OFF + payment OFF (minimal);
+ *                    exercises the flat, group-less Dispatch Logs shape
  */
 export const MOCK_CLIENTS: Client[] = [
   {
     id: 'acme-corp',
     name: 'Acme Corp',
+    fleetType: 'managed-fleet',
     config: {
       depots: [
-        { id: 'dep-arc', name: 'Arc Kitisuru Depot', address: '13 Plums Lane Avenue, Nairobi, Kenya' },
-        { id: 'dep-wl', name: 'Westlands Fulfillment Hub', address: '23 Ring Rd, Westlands, Nairobi' },
-        { id: 'dep-cbd', name: 'CBD Pickup Point', address: 'Moi Ave, Nairobi CBD' },
+        { id: 'dep-arc', name: 'Arc Kitisuru Depot', address: '13 Plums Lane Avenue, Nairobi, Kenya', broadcast: STANDARD_BROADCAST },
+        { id: 'dep-wl', name: 'Westlands Fulfillment Hub', address: '23 Ring Rd, Westlands, Nairobi', broadcast: STANDARD_BROADCAST },
+        // One round, no fallback, no pre-offer — the sequence ends "unaccepted" right
+        // after P1→P2→P3 fail once (no Fallback Round entry in the logs timeline).
+        {
+          id: 'dep-cbd',
+          name: 'CBD Pickup Point',
+          address: 'Moi Ave, Nairobi CBD',
+          broadcast: {
+            rounds: 1,
+            fallbackEnabled: false,
+            preOfferEnabled: false,
+            groups: [
+              { priority: 1, name: 'In-house', acceptanceWindowSeconds: 40, maxOrders: 10, totalDrivers: 6, retries: 1 },
+              { priority: 2, name: 'Suppliers', acceptanceWindowSeconds: 25, maxOrders: 8, totalDrivers: 4, retries: 1 },
+            ],
+          },
+        },
+        // No `broadcast` — a SaaS depot the admin never configured for broadcasting.
         { id: 'dep-kil', name: 'Kilimani Dispatch Hub', address: '5 Argwings Kodhek Rd, Kilimani' },
       ],
       items: { enabled: true, mode: 'product', valueRequired: true },
@@ -70,6 +107,7 @@ export const MOCK_CLIENTS: Client[] = [
   {
     id: 'naivas',
     name: 'Naivas Group',
+    fleetType: 'managed-fleet',
     config: {
       depots: [
         { id: 'dep-parklands', name: 'Parklands Collection Center', address: '6 Parklands Ave, Parklands, Nairobi' },
@@ -88,15 +126,24 @@ export const MOCK_CLIENTS: Client[] = [
   {
     id: 'java-house',
     name: 'Java House',
+    // Marketplace: no driver groups, so the depot's broadcast config carries only the
+    // sequence shape (no `groups`) — Dispatch Logs renders one flat responder log.
+    fleetType: 'marketplace',
     config: {
       depots: [
-        { id: 'dep-karen', name: 'Karen Distribution Hub', address: 'Karen Rd, Nairobi' },
+        {
+          id: 'dep-karen',
+          name: 'Karen Distribution Hub',
+          address: 'Karen Rd, Nairobi',
+          broadcast: { rounds: 1, fallbackEnabled: false, preOfferEnabled: false, groups: [] },
+        },
       ],
       items: { enabled: false, mode: 'manual', valueRequired: false },
       products: [],
       payment: { enabled: false },
-      autoBroadcast: false,
-      orderWaitMinutes: 0,
+      // Auto-broadcast ON so the marketplace Dispatch Logs shape is actually reachable.
+      autoBroadcast: true,
+      orderWaitMinutes: 3,
       pickupConfirmation: true,
       proofOfDelivery: false,
     },
@@ -285,6 +332,8 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
     package: 'Grocery delivery',
     items: 3,
     status: 'pending',
+    // Fixture: the hold window is still open — nothing broadcast yet (On Hold).
+    broadcastState: 'on-hold',
     driverId: null,
     createdAt: '2026-06-29T08:12:00',
     priority: 'standard',
@@ -298,6 +347,8 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
     package: 'Bakery order',
     items: 4,
     status: 'pending',
+    // Fixture: broadcast sequence ran and nobody accepted (Exhausted).
+    broadcastState: 'exhausted',
     driverId: null,
     createdAt: '2026-06-29T09:15:00',
     priority: 'standard',
@@ -313,6 +364,8 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
     package: 'Catering order',
     items: 1,
     status: 'broadcasted',
+    // Fixture: a priority-group leg is live right now (Broadcasting).
+    broadcastState: 'broadcasting',
     driverId: null,
     batchId: 'BC-4821',
     createdAt: '2026-06-29T08:30:00',
@@ -327,6 +380,8 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
     package: 'Supplements',
     items: 2,
     status: 'assigned',
+    // Fixture: all groups passed; the fallback sweep is live (Fallback).
+    broadcastState: 'fallback',
     driverId: 'DRV-04',
     createdAt: '2026-06-29T09:20:00',
     priority: 'standard',
@@ -340,6 +395,8 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
     package: 'Prescription medicines',
     items: 2,
     status: 'in-transit',
+    // Fixture: a driver accepted mid-sequence (Completed).
+    broadcastState: 'completed',
     driverId: 'DRV-01',
     createdAt: '2026-06-29T07:45:00',
     priority: 'express',
@@ -353,6 +410,8 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
     package: 'Grocery delivery',
     items: 5,
     status: 'at-depot',
+    // Fixture: dispatched by hand after the sequence failed (Manual after exhausted).
+    broadcastState: 'manual-after-exhausted',
     driverId: 'DRV-02',
     createdAt: '2026-06-29T08:50:00',
     priority: 'standard',
@@ -368,6 +427,8 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
     package: 'Electronics',
     items: 1,
     status: 'delivered',
+    // Fixture: dispatched by hand before any broadcast started (Manual before broadcast).
+    broadcastState: 'manual-before-broadcast',
     driverId: 'DRV-05',
     createdAt: '2026-06-29T06:30:00',
     priority: 'standard',

@@ -8,7 +8,7 @@
 > **Companion design spec:** Table Column Layout Specification (owns column widths, floors, truncation, responsive behaviour)
 > **Audience:** implementation agent + engineers
 > **Status:** Ready for build — domain logic (Parts 1–11) and orders-surface interaction (Part 12); generic component behaviour in Doc 3
-> **Version:** 3.1 — clarifies that **fleet / company type (`dispatch.fleetType`) is platform-provisioned** (set by LETA internal admin from the master account, read-only to the tenant), not a tenant-admin toggle; adds the LETA internal admin actor + the two-configuration-tier distinction (§2.2), and threads it through §7.5 / §9 / Appendix A. (3.0 — adds §7.2.1 Route line styling and the expanded-map chrome components/banner matrix, reconciled against wireframes `1522:115768` on 2026-07-27.)
+> **Version:** 3.2 — adds the **broadcast sequence model** (§7.5.1: typical rounds through per-depot priority driver groups, round-1-only pre-offer, optional fallback round, re-broadcast restarting the sequence with no demarcation), the **seven Dispatch Logs content states** and round-marker scroll navigation (§7.5.2), the **marketplace collapse to a single flat log** (§7.5.3), the **three drill-downs** (§7.5.4), and four depot-scoped `dispatch.broadcast.*` flags (Appendix A). (3.1 — clarifies that **fleet / company type (`dispatch.fleetType`) is platform-provisioned** (set by LETA internal admin from the master account, read-only to the tenant), not a tenant-admin toggle; adds the LETA internal admin actor + the two-configuration-tier distinction (§2.2), and threads it through §7.5 / §9 / Appendix A.) (3.0 — adds §7.2.1 Route line styling and the expanded-map chrome components/banner matrix, reconciled against wireframes `1522:115768` on 2026-07-27.)
 
 ---
 
@@ -357,16 +357,58 @@ A chronological record of everything that happened to the order.
 
 ### 7.5 Dispatch Logs tab
 
-Shows how the order reached (or is reaching) drivers. Content differs by company type and dispatch path:
+Shows how the order reached (or is reaching) drivers. Content is a function of `(dispatch.fleetType [platform], the depot's broadcast configuration [tenant], order status)`.
 
-- **SaaS / managed-fleet companies:** specific driver-level detail.
-- **Marketplace companies:** reach and response rate.
-- **Not yet broadcast** (unassigned, no broadcast sent): empty state.
-- **Manually dispatched orders:** a centred information card explaining the order was dispatched manually (no broadcast occurred).
+#### 7.5.1 The broadcast domain — sequences, rounds, and legs
 
-> **Company type is platform-set, not a tenant choice.** The SaaS/managed-fleet vs marketplace split above is the **`dispatch.fleetType`** account attribute — **provisioned by LETA internal admin from the master account** and fixed at onboarding, read-only to the tenant (§2.2, Appendix A). Neither the dispatcher nor the tenant Admin can toggle it; it only *selects which shape* an order's broadcast detail takes (driver-level detail vs reach/response-rate). The **dispatch path** (broadcast vs manual), by contrast, is tenant-/dispatcher-driven (§9). So the tab's content is a function of `(dispatch.fleetType [platform], dispatch path [tenant], order status)`.
+> **Ruled 2026-08-03.** This subsection is the authoritative model; it supersedes the earlier "driver-level detail vs reach/response-rate" framing.
 
-> Visual reference (Figma): [Dispatch Logs tab](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=384-106688). This tab was specced in depth in the dashboard redesign work.
+A **broadcast sequence** is one full attempt to place an order with a driver. It consists of:
+
+1. **N *typical rounds***, where N is admin-configured per depot (`dispatch.broadcast.rounds`). Each typical round broadcasts to the depot's **priority driver groups in priority order** — P1, then P2, then P3, and so on. Driver groups are created and managed by SaaS-company admins as part of the fleet-management capability, then **assigned to depots with a prioritisation order**.
+2. **Round 1 only** may be led by a **pre-offer broadcast** (`dispatch.broadcast.preOfferEnabled`). Pre-offer drivers are **not a group** — they are drivers the LETA routing algorithm found already on a **compatible route** for the delivery, and they may or may not belong to any priority group. Pre-offer **never repeats on later rounds**.
+3. **Optionally one closing *fallback round*** (`dispatch.broadcast.fallbackEnabled`), which **ignores groups entirely** and offers the order to every available driver near the depot.
+
+If the whole sequence goes unaccepted, the order is shown as **unsuccessful**, and the dispatcher may **re-broadcast** (restarting the entire sequence) or **dispatch manually** (managed-fleet only). A re-broadcast produces a **second sequence whose rounds simply continue the same timeline — there is no sequence demarcation.** A timeline may therefore read: Round 1 → Round 2 → Fallback Round → Round 1 → Round 2 → Fallback Round.
+
+Each individual broadcast within a round (the pre-offer lead, one priority group, or the fallback sweep) is a **leg**, and each leg is one entry in the Broadcast Logs timeline.
+
+**Configuration is scoped to the depot, not the client** — not every client is a SaaS tenant, and not every SaaS tenant configures broadcasting for all of its depots. A depot with no broadcast configuration never auto-broadcasts; its orders are dispatched manually. Consequently, if an admin sets one round and disables the fallback round, an unaccepted order's timeline shows **no Fallback Round entry**.
+
+#### 7.5.2 The seven content states
+
+| State | Shape |
+|---|---|
+| **On Hold** | Hold window still open, nothing broadcast. Neutral banner "Assign a driver to this order before broadcast begins." + Dispatch; zeroed summary; empty logs. |
+| **Broadcasting** | A leg is live. Title names the current group/pre-offer, badged `Round N of M`; animating progress bar. |
+| **Completed** | A driver accepted. Title "Broadcast Resolved at {group}"; the accepting driver renders **above** that leg's non-responder accordion. |
+| **Fallback** | All groups passed; broadcasting to every nearby driver. Badged `Fallback Round`; adds the subtle notice "If no driver accepts the fallback broadcast, you can re-broadcast the order(s) manually." |
+| **Exhausted** | Whole sequence unaccepted. Info banner "Broadcast unsuccessful. Try dispatching manually." + **Primary** Dispatch; "No driver accepted the broadcasts. **Re-broadcast** to try again." |
+| **Manually Dispatched (before broadcast)** | Only a "Manual Assignment" card (who/when + View Activity); empty logs. |
+| **Manually Dispatched (after exhausted)** | **Two** stacked cards — Manual Assignment *and* "Broadcasts unaccepted" — then the full timeline. **No** Re-broadcast link and **no** top banner. |
+
+The timeline is **newest-first**. Each round group is labelled by a **round marker**: chevron-down + label + chevron-up (Secondary / Extra Small / Icon Only). These are **scroll navigation**, not a pager and not a collapse toggle — chevron-up jumps to the newest entry of the next *newer* round, chevron-down to the newest entry of the next *older* one, across all rounds of all sequences. Each chevron is disabled when there is no round in that direction.
+
+#### 7.5.3 Fleet type
+
+> **Company type is platform-set, not a tenant choice.** The managed-fleet vs marketplace split is the **`dispatch.fleetType`** account attribute — **provisioned by LETA internal admin from the master account**, fixed at onboarding, read-only to the tenant (§2.2, Appendix A). Neither the dispatcher nor the tenant Admin can toggle it. The **dispatch path** (broadcast vs manual), by contrast, is tenant-/dispatcher-driven (§9).
+
+- **`managed-fleet`** — the full model above: rounds, priority groups, pre-offer, fallback, round markers, and the Priority Driver Groups drill-down.
+- **`marketplace`** — the tenant does not manage drivers, so **there is no concept of driver groups**. The tab collapses to a **single flat log entry** listing every driver who saw the broadcast and responded (accepted / declined / timed out). No rounds, no round markers, no `Round N of M` badge, no fallback, and **no Priority Driver Groups drill-down**.
+
+#### 7.5.4 Drill-downs
+
+Three sub-screens, each **replacing the whole drawer body** — own `ModalHeaders` with a back arrow + breadcrumb, no footer, order tabs hidden. Back returns to Dispatch Logs; × closes the drawer.
+
+| Drill-down | Availability |
+|---|---|
+| **Batched Orders** | Both fleet types. The orders sharing this broadcast batch. Batch ID shown in the toolbar (not as a column — it is redundant per-row). |
+| **Priority Driver Groups** | **Managed-fleet only.** The depot's group ladder, each card showing acceptance window / max orders / total drivers / retries + its escalation rule; the group currently receiving the broadcast is badged and carries a live progress bar. |
+| **Notified Drivers** | Both fleet types. Every driver the broadcast reached, with a notification count. **Marketplace drops** the filter chips, the group badge, the "In house / Supplier / No group" suffix, the phone line, and the trailing call button + its divider. |
+
+> The per-driver **call button is VOIP-gated** — only customers using LETA's VOIP integration can see or use it.
+
+> Visual reference (Figma): On Hold [`526:52830`](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=526-52830) · Broadcasting [`526:54608`](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=526-54608) · Completed [`536:59220`](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=536-59220) · Fallback [`548:148566`](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=548-148566) · Exhausted [`552:57340`](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=552-57340) · Manually Dispatched [`548:150265`](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=548-150265) · Manually Dispatched after exhausted [`1728:124762`](https://www.figma.com/design/xVa4kZAArZWWvl6QsfID8S/LETA-Playground?node-id=1728-124762)
 
 ---
 
@@ -388,6 +430,8 @@ What a dispatcher can change depends on physical custody. Editing does **not** t
 
 - **Company / fleet type is platform-provisioned, not a dispatch choice.** Whether a tenant is **SaaS / managed-fleet** or **marketplace** is set by **LETA internal admin from the master account** (`dispatch.fleetType`, fixed at onboarding, read-only to the tenant — §2.2, Appendix A). It governs *how* a broadcast reaches drivers and *how* the Dispatch Logs tab (§7.5) presents it. It is **not** something the dispatcher or tenant Admin selects — per order or in settings.
 - **Broadcast** is the automatic path: an order is offered to eligible drivers (SaaS managed-fleet or marketplace), producing the Broadcasted status and the Dispatch Logs tab detail in §7.5.
+- **The broadcast sequence is admin-configured per depot** (§7.5.1): a number of **typical rounds** through the depot's **priority driver groups** (P1 → P2 → P3 …), optionally led on round 1 only by a **pre-offer** broadcast to routing-matched drivers, and optionally closed by a **fallback round** to every driver near the depot. Driver groups are created and managed by SaaS-company admins, then assigned to depots with a prioritisation order. Config is **per depot, not per client** — not every client is a SaaS tenant, and not every SaaS tenant configures broadcasting for all of its depots; an unconfigured depot never auto-broadcasts.
+- **Re-broadcast restarts the whole sequence.** A second sequence's rounds continue the same Dispatch Logs timeline with **no sequence demarcation**.
 - **Manual dispatch** is the dispatcher-driven path: the dispatcher selects a driver directly. Manually dispatched orders show the centred information card in the Dispatch Logs tab rather than broadcast metrics.
 - The manual dispatch flow is a **centred modal** with a two-step progression — **Select Driver → Preview Route** — combining a driver list with a live map and an optimised route preview. (Full manual-dispatch modal spec is tracked separately; referenced here as the origin of the manual-dispatch order state.)
 
@@ -688,12 +732,18 @@ Fully defined in **Configuration Reference (Doc 2)** — no longer TBD. Named he
 | `payment.enabled` | Whether the Payment section appears |
 | `dispatch.enRoutePickup.enabled` | En-route pickup extension of Add to Trip (client-level, off by default) |
 | `dispatch.fleetType` | Marketplace vs. managed-fleet. **Platform-provisioned — set by LETA internal admin from the master account, fixed at onboarding, read-only to the tenant Admin** (not a tenant Administration toggle, despite being named alongside them here — see the tier note below and §2.2) |
+| `dispatch.broadcast.rounds` | Number of **typical rounds** in one broadcast sequence, before any fallback round (§7.5.1). **Depot-level** |
+| `dispatch.broadcast.fallbackEnabled` | Whether a closing **fallback round** (all drivers near the depot, group-agnostic) ends the sequence. **Depot-level** |
+| `dispatch.broadcast.preOfferEnabled` | Whether a **pre-offer** broadcast leads round 1 (routing-matched drivers on a compatible route; round 1 only, never repeats). **Depot-level** |
+| `dispatch.broadcast.groups` | The **priority driver groups** assigned to the depot, in priority order (P1 first), each with its acceptance window, max orders, driver count, and retries. Admin-created at company level, then assigned per depot with prioritisation. **Depot-level**; empty for marketplace tenants (no group concept) |
 | `scheduling.autoBroadcast.enabled` | Whether Scheduled orders auto-transition to Broadcasted at T−1h (else → Pending). Client-level |
 | `dispatch.orderWaitTime` | How long a non-scheduled order stays Pending before auto-broadcast (auto-broadcast clients; drives the §7.2 row-2b countdown). Client-level |
 | `pickup.confirmation.enabled` | Pickup PIN + Proof of Pickup requirement. Client-level only, no depot override |
 | `delivery.pod.signature.enabled` / `delivery.pod.photo.enabled` | Independent proof-of-delivery toggles |
 | `returns.driverInitiated.enabled` | Whether drivers can start a return from the Driver App |
 | `returns.compensation.model` | `none` / `fixed` / `percentage` |
+
+> **Scope note (added 2026-08-03).** The four `dispatch.broadcast.*` flags are **depot-scoped, not client-scoped** — a client may broadcast from some depots and dispatch manually from others. Doc 2 must model them on the depot record.
 
 > **Configuration tier note.** Most flags in this table are **tenant-admin toggles** (the Admin role sets them; Doc 2 is authoritative). **`dispatch.fleetType` is not one of them** — it is a **platform-provisioned account attribute** set by LETA internal admin from the master account and read-only to the tenant (§2.2). It is listed here only because order-management behaviour depends on it; it must **not** appear as an editable control in any tenant Settings/Administration surface, and **Doc 2 must scope it as platform-provisioned, not a tenant toggle.**
 
@@ -710,6 +760,7 @@ Broadcast/fleet mechanics (priority groups, acceptance windows, driver broadcast
 
 | Version | Date | Changes |
 |---|---|---|
+| 3.2 | Aug 2026 | **Broadcast sequence model specified** (ruled 2026-08-03), superseding the old "driver-level detail vs reach/response-rate" framing of §7.5. New **§7.5.1**: a *sequence* = N admin-configured **typical rounds** through the depot's **priority driver groups** in priority order, optionally led on **round 1 only** by a **pre-offer** broadcast (routing-matched drivers on a compatible route — not a group, never repeats), optionally closed by a **fallback round** (all drivers near the depot, group-agnostic); **re-broadcast restarts the whole sequence** and its rounds continue the same timeline with **no sequence demarcation**; each individual broadcast is a **leg** = one timeline entry. **Broadcast config is depot-scoped, not client-scoped** — an unconfigured depot never auto-broadcasts. New **§7.5.2**: the **seven** content states (On Hold · Broadcasting · Completed · Fallback · Exhausted · Manually Dispatched before broadcast · Manually Dispatched after exhausted — the last being **two** stacked cards with no Re-broadcast link and no banner), newest-first timeline, and **round markers as scroll navigation** (chevron-down/up jump to the neighbouring round's newest entry across all sequences; disabled at the ends) — explicitly *not* a pager and *not* a collapse toggle. New **§7.5.3**: `marketplace` tenants have **no driver groups**, so the tab collapses to a **single flat responder log** — no rounds, no round markers, no `Round N of M`, no fallback, no Priority Driver Groups drill-down. New **§7.5.4**: the three drill-downs replace the whole drawer body (back arrow + breadcrumb, no footer); **Priority Driver Groups is managed-fleet only**; marketplace **Notified Drivers** drops the filter chips, group badge, group suffix, phone line, and call button + divider. Call button noted as **VOIP-gated**. §9 gains the sequence summary; Appendix A gains **`dispatch.broadcast.{rounds,fallbackEnabled,preOfferEnabled,groups}`** with a depot-scope note. |
 | 3.1 | Jul 2026 | **Fleet / company type (`dispatch.fleetType`) clarified as platform-provisioned, not a tenant-admin toggle** (ruled 2026-07-31): it is set by **LETA internal admin from the master account**, fixed at onboarding, **read-only to the tenant Admin**. §2.2 gains the **LETA internal admin** actor and a **two-configuration-tier** distinction (platform-provisioned account attributes vs tenant-admin toggles; *scope* "client-level" ≠ *source* "tenant-editable"). Threaded through §7.5 (Dispatch Logs content = `(fleetType [platform], dispatch path [tenant], status)`), §9 (fleet type not a dispatch choice), and Appendix A (flag line + tier note; **Doc 2 must scope it as platform-provisioned, never a tenant Settings control**). |
 | 2.9 | Jul 2026 | **§7.2 summary-card matrix rows 1–3 corrected against the View Order wireframes** (`320:99590`, ruled 2026-07-20): a Pending order never carries a scheduled date — on auto-broadcast clients a Scheduled order goes straight to Broadcasted at T−1h, never through Pending; what holds a non-scheduled order in Pending is the **order wait time** (`dispatch.orderWaitTime`, new Appendix-A flag), whose countdown renders as new row 2b "Order broadcasting soon" / "{N} minutes to broadcast."; the old "row 2 applies to any pre-broadcast order" note withdrawn. Header status icons documented as mirroring the table's Order-ID cell icons + tooltips. Expanded-map nudge copy corrected to "Dispatch now to generate a delivery route." + driver-progress banner variant noted. Est-delivery/Delivered/Cancelled sub-copy trailing periods dropped (wireframe) |
 | 2.8 | Jul 2026 | **Update Status scoped out of Returned and Returning** (Ruled 2026-07-20) — per-order and bulk. §10.1 gains an explicit Update-Status availability ruling + AGENT flag (both options invalid for these states: Mark as Delivered contradicts a not-delivered order; Mark as Pending would erase failed-attempt history Returned preserves); it stays valid elsewhere (In Transit/Arrived → Mark as Delivered for offline reconciliation; failed pickup → Mark as Pending). §12.6 modal table moves **Returned** into the no-Update-Status row (a §1.9 carry-over corrected) alongside Returning + adds the reasoning/AGENT flag. §12.5 table overflow and §12.7 drawer-footer overflow drop Update Status from the **Returned** menus (Returning already had none). §12.9 — the selection toolbar must not offer Update Status when the selection is Returned/Returning; Bulk Reschedule lives in the "more" (⋯) overflow. |

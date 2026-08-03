@@ -25,7 +25,7 @@ import {
 } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
 import { useStore } from '../../store/useStore.js';
-import type { ClientConfig, Driver, Order, OrderStatus } from '../../store/types.js';
+import type { Client, ClientConfig, Driver, Order, OrderStatus } from '../../store/types.js';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
 import { Popover, MenuPanel, MenuDivider } from '../Popover.js';
 import { buildActivityTrail, DISPATCHER_NAME, type ActivityItem } from './activityModel.js';
@@ -34,6 +34,9 @@ import { ActivityTimeline, ActivityComposerSection, ActivityTerminalNotice } fro
 import { buildOrderDetail, type OrderDetailModel, type ProofFile } from './detailModel.js';
 import { ExpandedMapOverlay } from './OrderDetailMap.js';
 import { OrderOverviewCard } from './OrderOverviewCard.js';
+import { buildBroadcastModel } from './broadcastModel.js';
+import { DispatchLogsTab } from './DispatchLogsTab.js';
+import { DispatchLogsDrillDown, DRILL_TITLE, type DrillDown } from './DispatchLogsDrillDowns.js';
 
 /**
  * View Order drawer (Order Detail View, OM §7) — the Overview tab of the
@@ -303,7 +306,10 @@ export function OrderDetailDrawer({
 }): React.ReactElement | null {
   const orders = useStore((s) => s.orders);
   const getDriver = useStore((s) => s.getDriver);
-  const config = useStore((s) => s.client.config);
+  // The whole client, not just `config` — Dispatch Logs needs the platform-provisioned
+  // `fleetType` too, which deliberately sits outside the tenant-editable config.
+  const client = useStore((s) => s.client);
+  const config = client.config;
 
   const order = orderId ? (orders.find((o) => o.id === orderId) ?? null) : null;
 
@@ -337,6 +343,7 @@ export function OrderDetailDrawer({
       driverId={order.driverId}
       getDriver={getDriver}
       configKey={config}
+      client={client}
       entered={entered}
       closing={closing}
       commentIntent={commentIntent}
@@ -352,6 +359,7 @@ function DrawerBody({
   driverId,
   getDriver,
   configKey: config,
+  client,
   entered,
   closing,
   commentIntent = false,
@@ -363,6 +371,7 @@ function DrawerBody({
   driverId: string | null;
   getDriver: (id: string | null | undefined) => Driver | undefined;
   configKey: ClientConfig;
+  client: Client;
   entered: boolean;
   closing: boolean;
   commentIntent?: boolean;
@@ -389,6 +398,15 @@ function DrawerBody({
     [order, driver, config],
   );
   const activityItems = React.useMemo(() => buildActivityTrail(model, config), [model, config]);
+  // Dispatch Logs (§7.5) — the seven broadcast shapes, derived from
+  // (fleetType, the depot's broadcast config, status, provenance).
+  const broadcast = React.useMemo(
+    () => buildBroadcastModel(order, client, model.depot, driver?.name ?? null),
+    [order, client, model.depot, driver?.name],
+  );
+  // Dispatch Logs drill-down: replaces the whole drawer content (own header, no
+  // footer). Null = the main Dispatch Logs screen. Resets when leaving the tab.
+  const [drill, setDrill] = React.useState<DrillDown | null>(null);
   const status = order.status;
   // Terminal states show the driver card in read-only "view" mode: a single Open
   // button (like the trip card), not the active Change-driver + Call buttons
@@ -461,6 +479,9 @@ function DrawerBody({
   const [commentActive, setCommentActive] = React.useState(commentIntent);
   React.useEffect(() => {
     if (tab !== 1) setCommentActive(false);
+    // Leaving Dispatch Logs abandons any drill-down, so returning lands on its
+    // main screen rather than a stale sub-screen.
+    if (tab !== 2) setDrill(null);
   }, [tab]);
   const isCompleted = status === 'delivered' || status === 'cancelled';
   // Items accordion: once paginated (>5 items), lock the item-rows region to the
@@ -910,8 +931,33 @@ function DrawerBody({
           fillHeight
           role="dialog"
           aria-label={`Order ${order.id}`}
-          onEscape={onClose}
+          // Escape backs out of a drill-down one level before closing the drawer.
+          onEscape={drill ? () => setDrill(null) : onClose}
           header={
+            drill ? (
+              /* Drill-down header (`526:52839` et al): back arrow + breadcrumb + title,
+                 no secondary content, no tabs. Back returns to Dispatch Logs. */
+              <ModalHeaders
+                variant="default"
+                title={DRILL_TITLE[drill]}
+                onClose={onClose}
+                showNavArrow
+                onNavBack={() => setDrill(null)}
+                showBreadcrumb
+                breadcrumb={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
+                    <Button variant="plain" size="medium" showUnderline={false} onClick={() => setDrill(null)}>
+                      {order.id}
+                    </Button>
+                    <span className="text-label-s-regular" style={{ color: 'var(--text-default-label-idle)' }}>/</span>
+                    <span className="text-label-s-medium" style={{ color: 'var(--text-default-label)' }}>
+                      {DRILL_TITLE[drill]}
+                    </span>
+                  </div>
+                }
+                showSecondaryContent={false}
+              />
+            ) : (
             <ModalHeaders
               variant="with-tabs"
               title={order.id}
@@ -944,9 +990,11 @@ function DrawerBody({
                 />
               }
             />
+            )
           }
           footer={
-            tab === 1 ? (
+            // Drill-downs carry no footer (the wireframes end at the body).
+            drill ? null : tab === 1 ? (
               isCompleted ? (
                 <ActivityTerminalNotice />
               ) : (
@@ -1042,14 +1090,24 @@ function DrawerBody({
           }
           bodyStyle={{ backgroundColor: 'var(--surface-neutral-bg-default)' }}
         >
-          {tab === 0 && showSkeleton ? (
+          {drill ? (
+            <DispatchLogsDrillDown drill={drill} model={broadcast} depotName={depotName} />
+          ) : tab === 0 && showSkeleton ? (
             <DrawerSkeleton />
           ) : tab === 0 ? (
             overviewBody
           ) : tab === 1 ? (
             <ActivityTimeline items={reversedActivityItems} onViewProof={setProofView} onEditComment={handleCommentEdit} />
           ) : (
-            placeholderBody('Dispatch Logs')
+            <DispatchLogsTab
+              model={broadcast}
+              onViewActivity={() => setTab(1)}
+              onPriorityGroups={() => setDrill('priority-groups')}
+              onBatchedOrders={() => setDrill('batched-orders')}
+              onNotifiedDrivers={() => setDrill('notified-drivers')}
+              onRebroadcast={() => actions.stub('Re-broadcast')}
+              onDispatch={() => actions.dispatch(order.id)}
+            />
           )}
         </ModalShell>
       </div>

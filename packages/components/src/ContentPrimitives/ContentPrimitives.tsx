@@ -80,6 +80,13 @@ export interface ContentPrimitivesProps
   progressValue?: number;
   progressHelperText?: string;
   showProgressHelperText?: boolean;
+  /**
+   * Which {@link DesktopProgressIndicator} variant the Progress Indicator layout
+   * renders. Defaults to `task` (green) — the historical behaviour. Pass
+   * `system-process` for the blue system bar, as the Dispatch Logs Broadcast Status
+   * Card does (its Figma instance binds `Type: System Process`).
+   */
+  progressVariant?: 'upload' | 'task' | 'system-process';
 }
 
 // ─── Visual Anchor ───────────────────────────────────────────────
@@ -375,6 +382,7 @@ function ProgressIndicatorLayout(props: ContentPrimitivesProps) {
     progressValue = 50,
     progressHelperText = 'x of 10 steps completed',
     showProgressHelperText = true,
+    progressVariant = 'task',
   } = props;
 
   return (
@@ -395,7 +403,7 @@ function ProgressIndicatorLayout(props: ContentPrimitivesProps) {
       </div>
       {/* Progress bar */}
       <DesktopProgressIndicator
-        variant="task"
+        variant={progressVariant}
         value={progressValue}
         helperText={showProgressHelperText ? progressHelperText : undefined}
         style={{ width: '100%', flexShrink: 0 }}
@@ -610,7 +618,7 @@ export const ContentPrimitives = React.forwardRef<HTMLDivElement, ContentPrimiti
       showDescriptionLeadingIcon, descriptionLeadingIcon, onCopy,
       showMetricVariance, metricVarianceLabel, metricVarianceColor, metricVarianceIcon, showMetricSubtext,
       showEyebrowTrailingIcon, eyebrowTrailingIcon,
-      progressValue, progressHelperText, showProgressHelperText,
+      progressValue, progressHelperText, showProgressHelperText, progressVariant,
       ...htmlProps
     } = rest;
 
@@ -625,7 +633,7 @@ export const ContentPrimitives = React.forwardRef<HTMLDivElement, ContentPrimiti
       showDescriptionLeadingIcon, descriptionLeadingIcon, onCopy,
       showMetricVariance, metricVarianceLabel, metricVarianceColor, metricVarianceIcon, showMetricSubtext,
       showEyebrowTrailingIcon, eyebrowTrailingIcon,
-      progressValue, progressHelperText, showProgressHelperText,
+      progressValue, progressHelperText, showProgressHelperText, progressVariant,
     };
 
     return (
