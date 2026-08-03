@@ -109,8 +109,12 @@ export interface BroadcastModel {
   banner: { kind: 'assign-driver' | 'dispatch-manually'; text: string } | null;
   /** Fallback only: the subtle in-card notice under the progress bar. */
   inCardNotice: string | null;
-  /** Broadcast summary triplet. */
-  summary: { notifiedDrivers: number; elapsedLabel: string; batchedOrders: number };
+  /** On Hold only: seconds the countdown starts from (the tab ticks it down live). Null otherwise. */
+  holdSeconds: number | null;
+  /** Whether `summary.elapsedSeconds` should tick live (a broadcast is actually running). */
+  liveElapsed: boolean;
+  /** Broadcast summary triplet — `elapsedSeconds` is the raw value; the tab formats + ticks it. */
+  summary: { notifiedDrivers: number; elapsedSeconds: number; batchedOrders: number };
   /** Timeline legs, **newest first** (matching the Activity tab's ordering). */
   legs: BroadcastLeg[];
   /** Empty-state copy when `legs` is empty. */
@@ -174,9 +178,11 @@ function fmtRan(seconds: number, live: boolean, found: number): string {
   return `${live ? `${time} elapsed` : `Ran for ${time}`} · ${found} driver${found === 1 ? '' : 's'} found`;
 }
 
-function fmtElapsed(seconds: number): string {
-  if (seconds < 60) return `${seconds}s elapsed`;
-  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s elapsed`;
+/** "10s" / "2m 06s" — just the value, no trailing word (the label renders separately
+ *  so the number can be styled semibold and ticked live without re-parsing a string). */
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
 }
 
 function fmtStamp(base: Date, minuteOffset: number): string {
@@ -454,13 +460,14 @@ export function buildBroadcastModel(
   let showRebroadcastLink = false;
   let emptyDescription: string | null = null;
   let manualAssignment: BroadcastModel['manualAssignment'] = null;
+  let holdSeconds: number | null = null;
 
   const roundBadge = (round: number | null) =>
     round == null ? 'Fallback Round' : `Round ${round} of ${config?.rounds ?? 1}`;
 
   switch (state) {
     case 'on-hold': {
-      const holdSeconds = 10;
+      holdSeconds = 10;
       title = `Broadcast starts in ${holdSeconds} seconds`;
       subtext = 'When the hold window closes, the broadcast will run through all priority groups.';
       banner = { kind: 'assign-driver', text: 'Assign a driver to this order before broadcast begins.' };
@@ -553,9 +560,11 @@ export function buildBroadcastModel(
     showRebroadcastLink,
     banner,
     inCardNotice,
+    holdSeconds,
+    liveElapsed: state === 'broadcasting' || state === 'fallback',
     summary: {
       notifiedDrivers: notifiedDrivers.length,
-      elapsedLabel: fmtElapsed(elapsedSeconds),
+      elapsedSeconds,
       batchedOrders,
     },
     legs,

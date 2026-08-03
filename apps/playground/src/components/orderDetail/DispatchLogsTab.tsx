@@ -9,7 +9,8 @@ import {
 } from '@leta/components';
 import { Icon } from '@leta/icons';
 import { BroadcastEventAccordion } from './BroadcastEventAccordion.js';
-import type { BroadcastLeg, BroadcastModel } from './broadcastModel.js';
+import { formatDuration, type BroadcastLeg, type BroadcastModel } from './broadcastModel.js';
+import { useBroadcastSignalIcon } from './broadcastSignal.js';
 
 /**
  * Dispatch Logs tab — the main screen (OM §7.5). Renders all seven wireframed
@@ -71,6 +72,31 @@ function animateScrollTop(el: HTMLElement, top: number, duration = 320): void {
   }, duration + 40);
 }
 
+/** Ticks a countdown down to 0 once per second while `active` (On Hold's
+ *  "Broadcast starts in N seconds"). Seeded once from the model, not re-read on
+ *  every render, so the count survives unrelated parent re-renders. */
+function useCountdown(initialSeconds: number, active: boolean): number {
+  const [n, setN] = React.useState(initialSeconds);
+  React.useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setN((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [active]);
+  return n;
+}
+
+/** Ticks a counter up once per second while `active` (Broadcast summary's "elapsed"
+ *  reading, live only while a broadcast is actually running). */
+function useElapsedTicker(initialSeconds: number, active: boolean): number {
+  const [n, setN] = React.useState(initialSeconds);
+  React.useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setN((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [active]);
+  return n;
+}
+
 /** Plain / trailing-chevron drill-down link ("Priority Driver Groups ›"). */
 function DrillLink({ label, onClick }: { label: string; onClick: () => void }): React.ReactElement {
   return (
@@ -80,15 +106,31 @@ function DrillLink({ label, onClick }: { label: string; onClick: () => void }): 
   );
 }
 
-/** One icon + text pair in the Broadcast summary triplet. */
-function SummaryStat({ icon, text }: { icon: 'Account' | 'Timer' | 'Inventory'; text: string }): React.ReactElement {
+/** One icon + text pair in the Broadcast summary triplet. The value (the number)
+ *  is semibold, its label regular — two separate spans, not one uniform-weight
+ *  string. `value` carries tabular-nums since the elapsed stat ticks live and
+ *  digit-width jitter is otherwise disorienting to watch update. */
+function SummaryStat({
+  icon,
+  value,
+  label,
+}: {
+  icon: 'Account' | 'Timer' | 'Inventory';
+  value: string;
+  label: string;
+}): React.ReactElement {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
       <span style={{ display: 'flex', color: 'var(--icons-neutral-default)' }}>
         <Icon name={icon} outlined size={16} />
       </span>
-      <span className="text-label-m-medium" style={{ color: 'var(--text-default-label)', whiteSpace: 'nowrap' }}>
-        {text}
+      <span style={{ whiteSpace: 'nowrap' }}>
+        <span className="text-label-m-semibold" style={{ color: 'var(--text-default-label)', fontVariantNumeric: 'tabular-nums' }}>
+          {value}
+        </span>{' '}
+        <span className="text-label-m-regular" style={{ color: 'var(--text-default-label)' }}>
+          {label}
+        </span>
       </span>
     </div>
   );
@@ -114,6 +156,13 @@ function BroadcastStatusCard({
   onBatchedOrders: () => void;
   onRebroadcast: () => void;
 }): React.ReactElement {
+  // Live ticking — On Hold's countdown to 0, and the summary's elapsed reading
+  // (only while a broadcast is actually running; concluded states stay static).
+  const holdCountdown = useCountdown(model.holdSeconds ?? 0, model.state === 'on-hold');
+  const elapsedSeconds = useElapsedTicker(model.summary.elapsedSeconds, model.liveElapsed);
+  const displayTitle =
+    model.state === 'on-hold' ? `Broadcast starts in ${holdCountdown} second${holdCountdown === 1 ? '' : 's'}` : model.title;
+
   // Exhausted splices a "Re-broadcast" Plain button inline into the sentence.
   const subtextNode = model.showRebroadcastLink ? (
     <>
@@ -171,11 +220,11 @@ function BroadcastStatusCard({
             text={
               model.badge ? (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
-                  <span>{model.title}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{displayTitle}</span>
                   <Badge color="neutral" label={model.badge} />
                 </span>
               ) : (
-                model.title
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{displayTitle}</span>
               )
             }
             subtext={subtextNode}
@@ -199,18 +248,18 @@ function BroadcastStatusCard({
         </>
       )}
 
-      {/* Broadcast summary */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 'var(--spacing-20px)', width: '100%' }}>
+      {/* Broadcast summary — centered against the whole leading block (title + stats), not bottom-aligned. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-20px)', width: '100%' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', minWidth: 0 }}>
           <span className="text-label-m-semibold" style={{ color: 'var(--text-default-heading)' }}>
             Broadcast summary
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)', flexWrap: 'wrap' }}>
-            <SummaryStat icon="Account" text={`${model.summary.notifiedDrivers} notified drivers`} />
+            <SummaryStat icon="Account" value={String(model.summary.notifiedDrivers)} label="notified drivers" />
             <div style={{ width: 0, height: 20, borderLeft: 'var(--stroke-xs) solid var(--border-neutral-default)' }} />
-            <SummaryStat icon="Timer" text={model.summary.elapsedLabel} />
+            <SummaryStat icon="Timer" value={formatDuration(elapsedSeconds)} label="elapsed" />
             <div style={{ width: 0, height: 20, borderLeft: 'var(--stroke-xs) solid var(--border-neutral-default)' }} />
-            <SummaryStat icon="Inventory" text={`${model.summary.batchedOrders} batched orders`} />
+            <SummaryStat icon="Inventory" value={String(model.summary.batchedOrders)} label="batched orders" />
           </div>
         </div>
         <div style={{ flexShrink: 0 }}>
@@ -299,49 +348,73 @@ function AcceptedRow({ acceptedBy }: { acceptedBy: NonNullable<BroadcastLeg['acc
   );
 }
 
+/** A 1px dashed connector segment (Figma's `[6,6]` repeating pattern). */
+const DASH_LINE: React.CSSProperties = {
+  width: 1,
+  backgroundImage: 'repeating-linear-gradient(to bottom, var(--border-neutral-default) 0 6px, transparent 6px 12px)',
+};
+
 /**
- * One timeline entry. Mirrors the Activity tab's `ActivityRow` exactly — a 12px
- * Branch column (12px grey dot + dashed [6,6] line) beside a content column whose
- * own `paddingBottom: 40` supplies the inter-row gap, so the dashed line runs
- * *through* that gap into the next row's dot (rows stack with gap 0).
+ * One timeline entry. Per Figma `518:63890` ("Timeline Activity"), the Branch column
+ * (dot + dashed line) runs beside the row's **full** content — the optional round
+ * marker *and* the card — not just beside the card. That's what keeps the dash
+ * continuous across a round boundary: the marker sits inside the same right-hand
+ * column the branch is stretched against, instead of floating above it with no
+ * branch alongside.
+ *
+ * The dot's vertical offset from the row top is fixed by what precedes it in that
+ * column: 24px when the card is the first thing in the row (padding-20 + half the
+ * 20px title line, minus half the 12px dot), 64px when a round marker (40px) comes
+ * first (40 + 24). Every row renders a spacer of that exact height before the dot —
+ * transparent for the very first row in the whole timeline (nothing to connect to
+ * above it), dashed for every other row so the line runs unbroken through the gap
+ * left by the previous row's `paddingBottom: 40`.
  */
 function TimelineEntry({
   leg,
+  marker,
+  onMarkerOlder,
+  onMarkerNewer,
+  isFirst,
   isLast,
   legIndex,
 }: {
   leg: BroadcastLeg;
+  /** Round-marker label for this entry, if it opens a new round group. */
+  marker: string | null;
+  onMarkerOlder: (() => void) | null;
+  onMarkerNewer: (() => void) | null;
+  /** The very first entry in the whole timeline gets no incoming connector. */
+  isFirst: boolean;
   isLast: boolean;
   /** Marks this entry as the scroll target for round-marker navigation. */
   legIndex: number;
 }): React.ReactElement {
-  const badge = OUTCOME_BADGE[leg.outcome];
+  const outcomeBadge = OUTCOME_BADGE[leg.outcome];
+  // The live leg's badge cycles signal bars — same animation as the Priority Driver
+  // Groups card for the group currently being broadcast to.
+  const signalIcon = useBroadcastSignalIcon(leg.outcome === 'broadcasting');
+  const badgeIcon = leg.outcome === 'broadcasting' ? signalIcon : outcomeBadge.icon;
+  const circleOffset = marker ? 64 : 24;
+
   return (
     <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 12, gap: 4 }}>
+        <div style={{ ...( !isFirst ? DASH_LINE : { width: 1 } ), flexShrink: 0, height: circleOffset - 4 }} />
         <span style={{ display: 'flex', color: 'var(--icons-neutral-idle)', flexShrink: 0 }}>
-          <Icon name="Circle-Medium" size={12} />
+          <Icon name="Circle-Large" size={12} />
         </span>
-        {!isLast && (
-          <div
-            style={{
-              flex: '1 0 0',
-              width: 1,
-              minHeight: 12,
-              backgroundImage:
-                'repeating-linear-gradient(to bottom, var(--border-neutral-default) 0 6px, transparent 6px 12px)',
-            }}
-          />
-        )}
+        {!isLast && <div style={{ ...DASH_LINE, flex: '1 0 0', minHeight: 12 }} />}
       </div>
       <div data-leg-index={legIndex} style={{ display: 'flex', flexDirection: 'column', flex: '1 0 0', minWidth: 0, paddingBottom: 'var(--padding-40px)' }}>
+        {marker && <RoundMarker label={marker} onOlder={onMarkerOlder} onNewer={onMarkerNewer} />}
         <ContentCard>
           <ContentPrimitives
             type="utility"
             text={
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
                 <span>{leg.title}</span>
-                <Badge color={badge.color} label={badge.label} leadingIcon={badge.icon} />
+                <Badge color={outcomeBadge.color} label={outcomeBadge.label} leadingIcon={badgeIcon} />
               </span>
             }
             subtext={leg.subtext}
@@ -473,27 +546,28 @@ export function DispatchLogsTab({
               type="no-broadcast-logs"
               size="desktop"
               description={model.emptyDescription ?? undefined}
+              style={{ width: 480 }}
             />
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0, width: '100%' }}>
             {model.legs.map((leg, i) => {
-              const marker = markerAt.get(i);
+              const marker = markerAt.get(i) ?? null;
               // Neighbouring round groups, for the marker's scroll targets.
               const pos = groupStarts.indexOf(i);
               const newer = pos > 0 ? groupStarts[pos - 1]! : null;
               const older = pos >= 0 && pos < groupStarts.length - 1 ? groupStarts[pos + 1]! : null;
               return (
-                <React.Fragment key={leg.id}>
-                  {marker && (
-                    <RoundMarker
-                      label={marker}
-                      onNewer={newer != null ? scrollTo(newer) : null}
-                      onOlder={older != null ? scrollTo(older) : null}
-                    />
-                  )}
-                  <TimelineEntry leg={leg} isLast={i === model.legs.length - 1} legIndex={i} />
-                </React.Fragment>
+                <TimelineEntry
+                  key={leg.id}
+                  leg={leg}
+                  marker={marker}
+                  onMarkerNewer={newer != null ? scrollTo(newer) : null}
+                  onMarkerOlder={older != null ? scrollTo(older) : null}
+                  isFirst={i === 0}
+                  isLast={i === model.legs.length - 1}
+                  legIndex={i}
+                />
               );
             })}
           </div>

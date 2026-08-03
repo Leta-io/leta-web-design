@@ -132,11 +132,11 @@ export function BroadcastEventAccordion({
             justifyContent: 'space-between',
             gap: 'var(--spacing-20px)',
             padding: 'var(--padding-12px)',
-            // The header carries its own bottom stroke in Figma (present in both
-            // Open and Closed) — when Open it becomes the divider between the
-            // header and the driver list below; when Closed it's just the box's
-            // own bottom edge (the outer wrapper's border already draws that).
-            borderBottom: 'var(--stroke-xs) solid var(--border-neutral-default)',
+            // Only draw this stroke while Open, where it's the divider between the
+            // header and the revealed driver list. While Closed the header sits
+            // flush against the outer wrapper's own bottom border — drawing both
+            // produced a visible double stroke along that edge.
+            borderBottom: open ? 'var(--stroke-xs) solid var(--border-neutral-default)' : 'none',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
@@ -185,7 +185,10 @@ export function BroadcastEventAccordion({
                   showPassiveElements
                   passiveElements={
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
-                      <span className="text-label-s-regular" style={{ color: 'var(--text-default-sub-body)', whiteSpace: 'nowrap' }}>
+                      <span
+                        className="text-label-s-regular"
+                        style={{ color: 'var(--text-default-sub-body)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}
+                      >
                         {elapsed}s
                       </span>
                       <div style={{ width: 0, height: 20, borderLeft: 'var(--stroke-xs) solid var(--border-neutral-default)' }} />

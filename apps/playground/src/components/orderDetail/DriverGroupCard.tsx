@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Badge, ContentPrimitives, NotificationBanner } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
 import type { DriverGroup } from '../../store/types.js';
+import { prefersReducedMotion, useBroadcastSignalIcon } from './broadcastSignal.js';
 
 /**
  * Driver Group Card (Figma `1707:120011`, "Driver Group Cards") — one card per
@@ -33,12 +34,6 @@ function escalationCopy(group: DriverGroup, ladder: DriverGroup[], fallbackEnabl
     : `Broadcast will re-run from P1 after ${seconds} seconds if unaccepted.`;
 }
 
-/** Cycles through increasing signal strength while broadcasting — a "searching
- *  for drivers" illusion (Figma's Broadcasting badge only shows the 3-bar icon
- *  statically; the animation is a deliberate addition per design feedback). */
-const SIGNAL_ICONS: IconName[] = ['Signal-1-Bar', 'Signal-2-Bars', 'Signal-3-Bars'];
-const SIGNAL_STEP_MS = 500;
-
 let stylesInjected = false;
 function ensureStyles(): void {
   if (stylesInjected || typeof document === 'undefined') return;
@@ -50,10 +45,6 @@ function ensureStyles(): void {
 .leta-driver-group-spinner { animation: leta-driver-group-spin 1s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .leta-driver-group-spinner { animation: none; } }`;
   document.head.appendChild(el);
-}
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
 
 function MetricRow({ label, value, icon }: { label: string; value: string; icon?: IconName }): React.ReactElement {
@@ -108,14 +99,9 @@ export function DriverGroupCard({
     return () => clearInterval(t);
   }, [broadcasting]);
 
-  // "Searching for signal" illusion — cycles 1→2→3 bars while broadcasting.
-  // Reduced motion: settle on the full 3-bar icon instead of animating.
-  const [signalIdx, setSignalIdx] = React.useState(() => (prefersReducedMotion() ? SIGNAL_ICONS.length - 1 : 0));
-  React.useEffect(() => {
-    if (!broadcasting || prefersReducedMotion()) return;
-    const t = setInterval(() => setSignalIdx((i) => (i + 1) % SIGNAL_ICONS.length), SIGNAL_STEP_MS);
-    return () => clearInterval(t);
-  }, [broadcasting]);
+  // "Searching for signal" illusion — cycles 1→2→3 bars while broadcasting. Shared
+  // with the timeline's live "Broadcasting" badge so both read as one animation.
+  const signalIcon = useBroadcastSignalIcon(broadcasting);
 
   // Progress bar fills linearly over one full acceptance window, then loops —
   // each loop reads as one retry attempt (Retries: N in the metrics below).
@@ -179,7 +165,7 @@ export function DriverGroupCard({
               {meta.title}
             </span>
             {broadcasting && (
-              <Badge color="information" label="Broadcasting" leadingIcon={SIGNAL_ICONS[signalIdx]} />
+              <Badge color="information" label="Broadcasting" leadingIcon={signalIcon} />
             )}
           </div>
           {broadcasting && (
@@ -187,7 +173,12 @@ export function DriverGroupCard({
               <span className="leta-driver-group-spinner" style={{ display: 'flex', color: 'var(--icons-information-default)' }}>
                 <Icon name="Loading" size={16} />
               </span>
-              <span className="text-label-s-regular" style={{ color: 'var(--text-default-sub-body)', whiteSpace: 'nowrap' }}>
+              {/* tabular-nums: the elapsed/found counts tick live — fixed-width digits
+                  keep the text from jittering as it grows from 9s to 10s etc. */}
+              <span
+                className="text-label-s-regular"
+                style={{ color: 'var(--text-default-sub-body)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}
+              >
                 {elapsed}s elapsed · {driversFound} drivers found
               </span>
             </div>
