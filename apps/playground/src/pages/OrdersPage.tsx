@@ -459,6 +459,14 @@ export function OrdersPage(): React.ReactElement {
     setViewOrderId(id);
     setCommentIntentOrderId(id);
   }, []);
+  // "View Logs" (row ⋯ menu + the Finished table's Actions button) opens the
+  // drawer straight into the Dispatch Logs tab — same intent pattern as
+  // Add Comment above.
+  const [dispatchLogsIntentOrderId, setDispatchLogsIntentOrderId] = React.useState<string | null>(null);
+  const openOrderForDispatchLogs = React.useCallback((id: string) => {
+    setViewOrderId(id);
+    setDispatchLogsIntentOrderId(id);
+  }, []);
   // Externally-driven drawer skeleton (§9) — set briefly whenever an action's
   // outcome keeps the View Order drawer open, so the refreshed data reads as
   // "just fetched" rather than silently swapping in place.
@@ -1073,7 +1081,7 @@ export function OrdersPage(): React.ReactElement {
           iconOutlined
           onClick={(e) => {
             e.stopPropagation();
-            pushToast({ type: 'success', title: 'View Logs — coming soon', subtitle: 'This feature is in progress.' });
+            openOrderForDispatchLogs(o.id);
           }}
         >
           View Logs
@@ -1453,6 +1461,7 @@ export function OrdersPage(): React.ReactElement {
           onAddToTrip={addToTrip}
           onChangeDriver={changeDriver}
           onAddComment={openOrderForComment}
+          onViewLogs={openOrderForDispatchLogs}
         />
       )}
 
@@ -1462,7 +1471,8 @@ export function OrdersPage(): React.ReactElement {
       <OrderDetailDrawer
         orderId={viewOrderId}
         commentIntent={viewOrderId != null && commentIntentOrderId === viewOrderId}
-        onClose={() => { setViewOrderId(null); setCommentIntentOrderId(null); }}
+        dispatchLogsIntent={viewOrderId != null && dispatchLogsIntentOrderId === viewOrderId}
+        onClose={() => { setViewOrderId(null); setCommentIntentOrderId(null); setDispatchLogsIntentOrderId(null); }}
         loading={drawerLoading}
         actions={{
           dispatch: dispatchOrder,
@@ -1577,9 +1587,11 @@ interface OverlayHostProps {
   /** Add Comment (row ⋯ menu) — opens the order drawer on the Activity tab with
    *  the comment composer expanded. */
   onAddComment: (orderId: string) => void;
+  /** View Logs (row ⋯ menu) — opens the order drawer on the Dispatch Logs tab. */
+  onViewLogs: (orderId: string) => void;
 }
 
-function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, onPickStatus, countByStatus, selectedOrderList, deselect, onCreatedLabel, extraCols, onToggleColumn, filterGroups, appliedFilters, filterPreviewCount, onFilterSelectionChange, onFilterApply, onFilterReset, onImport, onSortChange, rowsPerPage, onRowsPerPage, onRequestUpdateStatus, onRequestReschedule, onRequestEdit, onAddToTrip, onChangeDriver, onAddComment }: OverlayHostProps): React.ReactElement {
+function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, onPickStatus, countByStatus, selectedOrderList, deselect, onCreatedLabel, extraCols, onToggleColumn, filterGroups, appliedFilters, filterPreviewCount, onFilterSelectionChange, onFilterApply, onFilterReset, onImport, onSortChange, rowsPerPage, onRowsPerPage, onRequestUpdateStatus, onRequestReschedule, onRequestEdit, onAddToTrip, onChangeDriver, onAddComment, onViewLogs }: OverlayHostProps): React.ReactElement {
   const { kind, anchor, orderId, orderStatus, group } = overlay;
 
   if (kind === 'rowsPerPage') {
@@ -1770,6 +1782,7 @@ function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, 
                     else if (a.label === 'Add To Trip') onAddToTrip(orderId);
                     else if (a.label === 'Change Driver') onChangeDriver(orderId);
                     else if (a.label === 'Add Comment') onAddComment(orderId);
+                    else if (a.label === 'View Logs') onViewLogs(orderId);
                     else pushToast({ type: 'success', title: a.label, subtitle: 'This action is coming soon.' });
                   }}
                 />

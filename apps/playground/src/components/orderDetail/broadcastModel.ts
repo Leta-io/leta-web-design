@@ -109,8 +109,16 @@ export interface BroadcastModel {
   banner: { kind: 'assign-driver' | 'dispatch-manually'; text: string } | null;
   /** Fallback only: the subtle in-card notice under the progress bar. */
   inCardNotice: string | null;
-  /** On Hold only: seconds the countdown starts from (the tab ticks it down live). Null otherwise. */
-  holdSeconds: number | null;
+  /**
+   * On Hold only: minutes the countdown starts from — the SAME base the
+   * Overview tab's "{N} minutes to broadcast." row derives from
+   * (`client.config.orderWaitMinutes`, hashed per order), so the two tabs
+   * always agree on the number and count down together regardless of which
+   * tab is mounted when (OM Appendix A `dispatch.orderWaitTime`). Null
+   * otherwise. The live subtraction happens in the drawer, not here — see
+   * `OrderDetailDrawer`'s `holdMinutesRemaining`.
+   */
+  holdMinutesBase: number | null;
   /** Whether `summary.elapsedSeconds` should tick live (a broadcast is actually running). */
   liveElapsed: boolean;
   /** Broadcast summary triplet — `elapsedSeconds` is the raw value; the tab formats + ticks it. */
@@ -460,15 +468,18 @@ export function buildBroadcastModel(
   let showRebroadcastLink = false;
   let emptyDescription: string | null = null;
   let manualAssignment: BroadcastModel['manualAssignment'] = null;
-  let holdSeconds: number | null = null;
+  let holdMinutesBase: number | null = null;
 
   const roundBadge = (round: number | null) =>
     round == null ? 'Fallback Round' : `Round ${round} of ${config?.rounds ?? 1}`;
 
   switch (state) {
     case 'on-hold': {
-      holdSeconds = 10;
-      title = `Broadcast starts in ${holdSeconds} seconds`;
+      // Same formula as detailModel.ts's row-2b "{N} minutes to broadcast." —
+      // both read `client.config.orderWaitMinutes` and hash the same order id,
+      // so the two tabs start from an identical base (OM Appendix A).
+      holdMinutesBase = (h % Math.max(client.config.orderWaitMinutes, 2)) + 1;
+      title = `Broadcast starts in ${holdMinutesBase} minute${holdMinutesBase === 1 ? '' : 's'}`;
       subtext = 'When the hold window closes, the broadcast will run through all priority groups.';
       banner = { kind: 'assign-driver', text: 'Assign a driver to this order before broadcast begins.' };
       emptyDescription =
@@ -560,7 +571,7 @@ export function buildBroadcastModel(
     showRebroadcastLink,
     banner,
     inCardNotice,
-    holdSeconds,
+    holdMinutesBase,
     liveElapsed: state === 'broadcasting' || state === 'fallback',
     summary: {
       notifiedDrivers: notifiedDrivers.length,

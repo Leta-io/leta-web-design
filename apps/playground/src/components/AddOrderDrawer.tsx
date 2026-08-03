@@ -261,10 +261,21 @@ export function AddOrderDrawer({ open, config, onClose, onSubmit, mode = 'create
   // Flips true a frame after mount so the CSS transition has a "from" state to
   // animate away from (applying the open transform on the very first paint
   // wouldn't animate — transitions only fire on a subsequent style change).
+  // A SINGLE rAF isn't enough: it fires before the browser has painted the
+  // initial (closed) state, so React's first render and the `open` class flip
+  // often land in the same paint and the slide-in never animates (confirmed
+  // live — the panel appeared fully open instantly). Nesting a second rAF
+  // guarantees a paint happens in between.
   const [entered, setEntered] = React.useState(false);
   React.useEffect(() => {
-    const raf = requestAnimationFrame(() => setEntered(true));
-    return () => cancelAnimationFrame(raf);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setEntered(true));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
   }, []);
   // True once the drawer's OWN slide-in transition has genuinely finished (not
   // just started, like `entered`) — guards the portal-anchored pickers (date /

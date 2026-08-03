@@ -117,13 +117,18 @@ export const NotificationBanner = React.forwardRef<
     ...style,
   };
 
-  // Leading element — icon + content. Filled → centre the icon against the
-  // content block (Figma `Leading element` counterAlign CENTER); subtle →
-  // top-align with a 1px top pad so the icon optically centres with the first line.
+  // Leading element — icon + content. Both variants top-align the icon with a
+  // 1px top pad so it optically centres with the first text line (the title
+  // for filled, the body for subtle) — verified against Figma `699:66232`
+  // (Broadcast Fallback: title + a wrapped 2-line description), where a
+  // vertically-centred icon would float mid-block instead of sitting level
+  // with the title. A prior round had this conditioned on `isFilled` (centre
+  // for filled), which only coincidentally looked right for single-line
+  // filled banners — restoring the single top-aligned rule for both.
   const leadingElementStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'row',
-    alignItems: isFilled ? 'center' : 'flex-start',
+    alignItems: 'flex-start',
     gap: 8,
     flex: 1,
     minWidth: 0,
@@ -170,9 +175,9 @@ export const NotificationBanner = React.forwardRef<
   return (
     <div ref={ref} role="status" style={rootStyle} {...rest}>
       <div style={leadingElementStyle}>
-        {/* Leading Icon — filled centres against the content, so no top pad;
-            subtle top-aligns with a 1px top pad (Figma `Leading Icon` pad 1/0/0/0). */}
-        <div style={{ flexShrink: 0, display: 'flex', paddingTop: isFilled ? 0 : 'var(--padding-1px)', color: config.iconColor }}>
+        {/* Leading Icon — top-aligned with a 1px top pad (Figma `Leading Icon`
+            pad 1/0/0/0), both variants. */}
+        <div style={{ flexShrink: 0, display: 'flex', paddingTop: 'var(--padding-1px)', color: config.iconColor }}>
           <Icon name={icon ?? config.iconName} outlined={false} size={18} />
         </div>
 

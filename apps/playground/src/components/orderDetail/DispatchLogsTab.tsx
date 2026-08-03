@@ -72,19 +72,6 @@ function animateScrollTop(el: HTMLElement, top: number, duration = 320): void {
   }, duration + 40);
 }
 
-/** Ticks a countdown down to 0 once per second while `active` (On Hold's
- *  "Broadcast starts in N seconds"). Seeded once from the model, not re-read on
- *  every render, so the count survives unrelated parent re-renders. */
-function useCountdown(initialSeconds: number, active: boolean): number {
-  const [n, setN] = React.useState(initialSeconds);
-  React.useEffect(() => {
-    if (!active) return;
-    const t = setInterval(() => setN((s) => (s > 0 ? s - 1 : 0)), 1000);
-    return () => clearInterval(t);
-  }, [active]);
-  return n;
-}
-
 /** Ticks a counter up once per second while `active` (Broadcast summary's "elapsed"
  *  reading, live only while a broadcast is actually running). */
 function useElapsedTicker(initialSeconds: number, active: boolean): number {
@@ -145,23 +132,29 @@ function SummaryStat({
  */
 function BroadcastStatusCard({
   model,
+  holdMinutesRemaining,
   onViewActivity,
   onPriorityGroups,
   onBatchedOrders,
   onRebroadcast,
 }: {
   model: BroadcastModel;
+  /** Live minutes-remaining for On Hold, computed by the drawer from the SAME
+   *  base + elapsed-since-open the Overview tab's "{N} minutes to broadcast."
+   *  row uses, so the two tabs always show the same number (OM Appendix A). */
+  holdMinutesRemaining: number | null;
   onViewActivity: () => void;
   onPriorityGroups: () => void;
   onBatchedOrders: () => void;
   onRebroadcast: () => void;
 }): React.ReactElement {
-  // Live ticking — On Hold's countdown to 0, and the summary's elapsed reading
-  // (only while a broadcast is actually running; concluded states stay static).
-  const holdCountdown = useCountdown(model.holdSeconds ?? 0, model.state === 'on-hold');
+  // Live ticking — the summary's elapsed reading (only while a broadcast is
+  // actually running; concluded states stay static). On Hold's countdown
+  // isn't ticked here — it's handed down already-live from the drawer.
   const elapsedSeconds = useElapsedTicker(model.summary.elapsedSeconds, model.liveElapsed);
+  const holdMinutes = holdMinutesRemaining ?? model.holdMinutesBase ?? 1;
   const displayTitle =
-    model.state === 'on-hold' ? `Broadcast starts in ${holdCountdown} second${holdCountdown === 1 ? '' : 's'}` : model.title;
+    model.state === 'on-hold' ? `Broadcast starts in ${holdMinutes} minute${holdMinutes === 1 ? '' : 's'}` : model.title;
 
   // Exhausted splices a "Re-broadcast" Plain button inline into the sentence.
   const subtextNode = model.showRebroadcastLink ? (
@@ -444,6 +437,7 @@ function roundLabel(leg: BroadcastLeg): string {
 
 export function DispatchLogsTab({
   model,
+  holdMinutesRemaining,
   onViewActivity,
   onPriorityGroups,
   onBatchedOrders,
@@ -452,6 +446,8 @@ export function DispatchLogsTab({
   onDispatch,
 }: {
   model: BroadcastModel;
+  /** See {@link BroadcastStatusCard}'s prop of the same name. */
+  holdMinutesRemaining: number | null;
   onViewActivity: () => void;
   onPriorityGroups: () => void;
   onBatchedOrders: () => void;
@@ -518,6 +514,7 @@ export function DispatchLogsTab({
 
       <BroadcastStatusCard
         model={model}
+        holdMinutesRemaining={holdMinutesRemaining}
         onViewActivity={onViewActivity}
         onPriorityGroups={onPriorityGroups}
         onBatchedOrders={onBatchedOrders}

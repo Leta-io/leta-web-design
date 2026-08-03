@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { createPortal } from 'react-dom';
 import { ModalDialog, SelectionControl, TextArea } from '@leta/components';
+import { DialogOverlay } from './DialogOverlay.js';
 
 /**
  * Cancel Order modal (Figma `1382:104119`, OM §11.1) — the reason-capture
@@ -47,14 +47,9 @@ export function CancelOrderModal({ orderIds, onClose, onConfirm }: CancelOrderMo
 
   const canConfirm = selected.size > 0 && (!selected.has('Other') || note.trim().length > 0);
 
-  return createPortal(
-    <>
-      <div
-        aria-hidden
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(16,16,16,0.4)', zIndex: 1600 }}
-      />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1601 }}>
+  return (
+    <DialogOverlay onClose={onClose}>
+      {({ close, closeAnd }) => (
         <ModalDialog
           variant="multi-choice"
           title="Cancel Order"
@@ -64,9 +59,9 @@ export function CancelOrderModal({ orderIds, onClose, onConfirm }: CancelOrderMo
           confirmDisabled={!canConfirm}
           confirmIconLeft="Delete"
           bodyHeight={454}
-          onCancel={onClose}
-          onClose={onClose}
-          onConfirm={() => canConfirm && onConfirm([...selected], note.trim())}
+          onCancel={close}
+          onClose={close}
+          onConfirm={() => canConfirm && closeAnd(() => onConfirm([...selected], note.trim()))}
         >
           {/* Reasons — multi-select checkboxes (wireframe copy supersedes the
               older OM §11.1 reason-code list). */}
@@ -104,8 +99,7 @@ export function CancelOrderModal({ orderIds, onClose, onConfirm }: CancelOrderMo
             />
           </div>
         </ModalDialog>
-      </div>
-    </>,
-    document.body,
+      )}
+    </DialogOverlay>
   );
 }

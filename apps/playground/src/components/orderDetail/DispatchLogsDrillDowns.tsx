@@ -199,6 +199,7 @@ function PriorityGroupsScreen({ model }: { model: BroadcastModel }): React.React
         <NotificationBanner
           type="highlight"
           variant="filled"
+          icon="Fix"
           title="Broadcast Fallback"
           description={
             model.config.fallbackEnabled

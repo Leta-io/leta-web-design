@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { createPortal } from 'react-dom';
 import { ModalDialog, OptionCard } from '@leta/components';
 import { Icon } from '@leta/icons';
 import type { OrderStatus } from '../store/types.js';
+import { DialogOverlay } from './DialogOverlay.js';
 
 /**
  * Update Status modal (Figma `1239:108227`, OM §12.6) — a manual status override.
@@ -54,10 +54,9 @@ export function UpdateStatusModal({ orderIds, statuses, onClose, onConfirm }: Up
   // gap 16) + pad 20.
   const bodyHeight = 20 + 20 + 24 + options.length * 76 + Math.max(0, options.length - 1) * 16 + 20;
 
-  return createPortal(
-    <>
-      <div aria-hidden onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,16,16,0.4)', zIndex: 1600 }} />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1601 }}>
+  return (
+    <DialogOverlay onClose={onClose}>
+      {({ close, closeAnd }) => (
         <ModalDialog
           variant="multi-choice"
           title="Update Status"
@@ -66,9 +65,9 @@ export function UpdateStatusModal({ orderIds, statuses, onClose, onConfirm }: Up
           confirmDisabled={!selected}
           confirmIconLeft="Check"
           bodyHeight={bodyHeight}
-          onCancel={onClose}
-          onClose={onClose}
-          onConfirm={() => selected && onConfirm(selected)}
+          onCancel={close}
+          onClose={close}
+          onConfirm={() => selected && closeAnd(() => onConfirm(selected))}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-24px)', width: '100%' }}>
             <span className="text-body-m-medium" style={{ color: 'var(--text-default-body)' }}>
@@ -100,8 +99,7 @@ export function UpdateStatusModal({ orderIds, statuses, onClose, onConfirm }: Up
             </div>
           </div>
         </ModalDialog>
-      </div>
-    </>,
-    document.body,
+      )}
+    </DialogOverlay>
   );
 }

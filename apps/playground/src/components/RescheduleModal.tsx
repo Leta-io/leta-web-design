@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { createPortal } from 'react-dom';
 import { ModalDialog, OptionCard, Select, DateTimePicker, NotificationBanner } from '@leta/components';
 import { Icon } from '@leta/icons';
 import { Popover } from './Popover.js';
+import { DialogOverlay } from './DialogOverlay.js';
 
 /**
  * Reschedule Order modal (Figma `1239:108226` bulk / `1408:237256` single,
@@ -90,10 +90,27 @@ export function RescheduleModal({ orderIds, anchorDate, chipBase, noOpDate = nul
     setPickerAnchor(box.getBoundingClientRect());
   };
 
-  return createPortal(
-    <>
-      <div aria-hidden onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,16,16,0.4)', zIndex: 1600 }} />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1601 }}>
+  return (
+    <DialogOverlay
+      onClose={onClose}
+      extra={
+        pickerAnchor && (
+          <Popover anchorRect={pickerAnchor} onClose={() => setPickerAnchor(null)} placement="bottom-start">
+            <DateTimePicker
+              type="date-time"
+              platform="desktop"
+              onApply={({ date, time }) => {
+                const d = combine(date, time);
+                if (d) { setManualDate(d); setSelectedIdx('manual'); }
+                setPickerAnchor(null);
+              }}
+              onCancel={() => setPickerAnchor(null)}
+            />
+          </Popover>
+        )
+      }
+    >
+      {({ close, closeAnd }) => (
         <ModalDialog
           variant="multi-choice"
           title="Reschedule Order"
@@ -102,9 +119,9 @@ export function RescheduleModal({ orderIds, anchorDate, chipBase, noOpDate = nul
           confirmDisabled={isNoOp}
           confirmIconLeft="Check"
           bodyHeight={hasDriverHeld ? 440 : 360}
-          onCancel={onClose}
-          onClose={onClose}
-          onConfirm={() => !isNoOp && onConfirm(chosenValue)}
+          onCancel={close}
+          onClose={close}
+          onConfirm={() => !isNoOp && closeAnd(() => onConfirm(chosenValue))}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-24px)', width: '100%' }}>
             {/* Consequence warning — a selected order is driver-held (changelog §1). */}
@@ -167,24 +184,7 @@ export function RescheduleModal({ orderIds, anchorDate, chipBase, noOpDate = nul
             </div>
           </div>
         </ModalDialog>
-      </div>
-
-      {/* Manual date/time picker (opens over the modal). */}
-      {pickerAnchor && (
-        <Popover anchorRect={pickerAnchor} onClose={() => setPickerAnchor(null)} placement="bottom-start">
-          <DateTimePicker
-            type="date-time"
-            platform="desktop"
-            onApply={({ date, time }) => {
-              const d = combine(date, time);
-              if (d) { setManualDate(d); setSelectedIdx('manual'); }
-              setPickerAnchor(null);
-            }}
-            onCancel={() => setPickerAnchor(null)}
-          />
-        </Popover>
       )}
-    </>,
-    document.body,
+    </DialogOverlay>
   );
 }

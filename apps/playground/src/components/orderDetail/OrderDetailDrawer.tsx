@@ -56,6 +56,26 @@ import { DispatchLogsDrillDown, DRILL_TITLE, type DrillDown } from './DispatchLo
 // driven by inline styles from the `entered`/`closing` state — deterministic
 // regardless of stylesheet lifecycle.
 
+// Tab-switch body transition — a one-shot fade + slight rise on the newly
+// mounted panel (Overview / Activity / Dispatch Logs, or a Dispatch Logs
+// drill-down). A `transition` class needs a subsequent style change to
+// animate and races the double-rAF timing the drawer slide needed; a
+// `@keyframes` animation instead runs unconditionally from the moment a new
+// element mounts, which is exactly the case here (the body is re-keyed per
+// tab, so React always mounts a fresh node on switch).
+let tabFadeStylesInjected = false;
+function ensureTabFadeStyles(): void {
+  if (tabFadeStylesInjected || typeof document === 'undefined') return;
+  tabFadeStylesInjected = true;
+  const el = document.createElement('style');
+  el.setAttribute('data-leta', 'order-detail-tab-fade');
+  el.textContent = `
+@keyframes leta-tab-body-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.leta-tab-body-enter { animation: leta-tab-body-in 220ms cubic-bezier(0.2, 0, 0, 1); }
+@media (prefers-reduced-motion: reduce) { .leta-tab-body-enter { animation: none; } }`;
+  document.head.appendChild(el);
+}
+
 /** Footer/actions surface for a status (§12.7 drawer footer + v2.8 ruling). */
 function footerFor(status: OrderStatus): {
   leading: 'cancel' | 'return' | null;
@@ -289,6 +309,7 @@ export function OrderDetailDrawer({
   actions,
   loading = false,
   commentIntent = false,
+  dispatchLogsIntent = false,
 }: {
   /** The order to show; null renders nothing. */
   orderId: string | null;
@@ -303,6 +324,10 @@ export function OrderDetailDrawer({
    *  focused (used by the "Add Comment" entry points). Consumed once per order,
    *  when the drawer opens (DrawerBody remounts per order id). */
   commentIntent?: boolean;
+  /** Open straight into the Dispatch Logs tab (used by the "View Logs" entry
+   *  points — the row ⋯ menu and the Finished table's Actions button). Consumed
+   *  once per order, same as `commentIntent`. */
+  dispatchLogsIntent?: boolean;
 }): React.ReactElement | null {
   const orders = useStore((s) => s.orders);
   const getDriver = useStore((s) => s.getDriver);
@@ -313,13 +338,23 @@ export function OrderDetailDrawer({
 
   const order = orderId ? (orders.find((o) => o.id === orderId) ?? null) : null;
 
-  // Enter/exit choreography (kept mounted through the exit).
+  // Enter/exit choreography (kept mounted through the exit). A single rAF
+  // fires before the browser paints the initial (offscreen) state, so the
+  // mount render and the `entered` flip can land in the same paint and skip
+  // the slide-in entirely (confirmed live) — nest a second rAF to guarantee
+  // an intervening paint.
   const [entered, setEntered] = React.useState(false);
   const [closing, setClosing] = React.useState(false);
   React.useEffect(() => {
     if (order) {
-      const raf = requestAnimationFrame(() => setEntered(true));
-      return () => cancelAnimationFrame(raf);
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => setEntered(true));
+      });
+      return () => {
+        cancelAnimationFrame(raf1);
+        cancelAnimationFrame(raf2);
+      };
     }
     setEntered(false);
     setClosing(false);
@@ -347,6 +382,7 @@ export function OrderDetailDrawer({
       entered={entered}
       closing={closing}
       commentIntent={commentIntent}
+      dispatchLogsIntent={dispatchLogsIntent}
       onClose={close}
       actions={actions}
       loading={loading}
@@ -363,6 +399,7 @@ function DrawerBody({
   entered,
   closing,
   commentIntent = false,
+  dispatchLogsIntent = false,
   onClose,
   actions,
   loading,
@@ -375,14 +412,17 @@ function DrawerBody({
   entered: boolean;
   closing: boolean;
   commentIntent?: boolean;
+  dispatchLogsIntent?: boolean;
   onClose: () => void;
   actions: OrderDetailActions;
   loading: boolean;
 }): React.ReactElement {
+  ensureTabFadeStyles();
   // Tab + composer state live here (DrawerBody remounts per order via the
-  // `key={order.id}`), so both initialize from `commentIntent`: an Add-Comment
-  // open lands on the Activity tab (index 1) with the composer already expanded.
-  const [tab, setTab] = React.useState(commentIntent ? 1 : 0);
+  // `key={order.id}`), so both initialize from `commentIntent`/`dispatchLogsIntent`:
+  // an Add-Comment open lands on the Activity tab (index 1) with the composer
+  // already expanded; a View-Logs open lands on the Dispatch Logs tab (index 2).
+  const [tab, setTab] = React.useState(commentIntent ? 1 : dispatchLogsIntent ? 2 : 0);
   // Brief skeleton on first open for this order (remounts via the `key={order.id}`
   // above, so this resets per order) — independent of the externally-driven
   // `loading` prop (action-triggered refresh while staying open).
@@ -420,16 +460,25 @@ function DrawerBody({
   void tick;
   const liveSeconds = Math.floor((Date.now() - openedAt.current) / 1000);
   const elapsed = model.ticks ? model.elapsedBase + liveSeconds : model.elapsedBase;
+  // Shared by the Overview row's countdown AND the Dispatch Logs On Hold
+  // countdown below — one formula, so the two tabs can't drift apart.
+  const minutesRemaining = (base: number) => Math.max(1, base - Math.floor(liveSeconds / 60));
   const summarySub = (() => {
     const s = model.summary;
     if (s.live === 'seconds-elapsed') return `${(s.liveBase ?? 0) + liveSeconds} seconds elapsed.`;
     if (s.live === 'minutes-until-broadcast' || s.live === 'minutes-to-broadcast') {
-      const n = Math.max(1, (s.liveBase ?? 1) - Math.floor(liveSeconds / 60));
+      const n = minutesRemaining(s.liveBase ?? 1);
       const unit = n === 1 ? 'minute' : 'minutes';
       return `${n} ${unit} ${s.live === 'minutes-until-broadcast' ? 'until' : 'to'} broadcast.`;
     }
     return s.sub;
   })();
+  // Dispatch Logs' "Broadcast starts in {N} minutes" reads the identical base
+  // (`client.config.orderWaitMinutes`, hashed the same way) through the SAME
+  // `liveSeconds` clock the Overview row above uses — not a separate local
+  // countdown — so switching tabs mid-count never shows a different number
+  // (OM Appendix A `dispatch.orderWaitTime` drives both).
+  const holdMinutesRemaining = broadcast.holdMinutesBase != null ? minutesRemaining(broadcast.holdMinutesBase) : null;
 
   // Overlays
   const [mapExpanded, setMapExpanded] = React.useState(false);
@@ -1090,6 +1139,10 @@ function DrawerBody({
           }
           bodyStyle={{ backgroundColor: 'var(--surface-neutral-bg-default)' }}
         >
+          {/* Keyed by tab + drill so switching either remounts a fresh node and
+              replays the fade-in — a plain conditional swap has nothing to key
+              off and would only animate once, on first mount. */}
+          <div key={drill ?? `tab-${tab}`} className="leta-tab-body-enter" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
           {drill ? (
             <DispatchLogsDrillDown drill={drill} model={broadcast} depotName={depotName} />
           ) : tab === 0 && showSkeleton ? (
@@ -1101,6 +1154,7 @@ function DrawerBody({
           ) : (
             <DispatchLogsTab
               model={broadcast}
+              holdMinutesRemaining={holdMinutesRemaining}
               onViewActivity={() => setTab(1)}
               onPriorityGroups={() => setDrill('priority-groups')}
               onBatchedOrders={() => setDrill('batched-orders')}
@@ -1109,6 +1163,7 @@ function DrawerBody({
               onDispatch={() => actions.dispatch(order.id)}
             />
           )}
+          </div>
         </ModalShell>
       </div>
 
