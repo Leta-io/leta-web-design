@@ -178,6 +178,9 @@ const DEFAULT_SORT_OPTIONS = [
   { label: 'Created', ascLabel: 'Oldest to Newest', descLabel: 'Newest to Oldest' },
   { label: 'Duration', ascLabel: 'Low to High', descLabel: 'High to Low' },
   { label: 'Last Updated', ascLabel: 'Oldest to Newest', descLabel: 'Newest to Oldest' },
+  // Distance is a numeric dimension like Duration (Table Column spec §2.4) —
+  // dispatchers sort by it to plan routes and pick who to assign.
+  { label: 'Distance', ascLabel: 'Low to High', descLabel: 'High to Low' },
 ];
 
 const USER_MENU_GROUPS: { label: string; icon: IconName; chevron?: boolean }[][] = [

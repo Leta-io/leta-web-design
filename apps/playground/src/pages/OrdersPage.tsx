@@ -38,6 +38,8 @@ import {
   creatorFor,
   creatorLabelFor,
   depotForOrder,
+  distanceKmFor,
+  distanceLabelFor,
   durationSecondsFor,
   formatCreated,
   idHash,
@@ -157,9 +159,12 @@ function rescheduleData(selected: Order[]): RescheduleData {
 // *column* already just aliases createdAt too — see the cellByLabel map
 // below), so it orders by the same value as Created; that's consistent with
 // what's actually displayed, not a stand-in for a missing feature.
-type SortField = 'created' | 'duration' | 'lastUpdated';
-const SORT_FIELDS: SortField[] = ['created', 'duration', 'lastUpdated'];
+// Distance sorts by the real derived km (the same value the cell shows and the
+// map draws), so "Low to High" / "High to Low" order by actual trip length.
+type SortField = 'created' | 'duration' | 'lastUpdated' | 'distance';
+const SORT_FIELDS: SortField[] = ['created', 'duration', 'lastUpdated', 'distance'];
 function sortValueFor(o: Order, field: SortField): number {
+  if (field === 'distance') return distanceKmFor(o);
   if (field === 'duration') {
     const isFinished = o.status === 'delivered' || o.status === 'cancelled';
     const rawSla = slaStateFor(o);
@@ -1185,6 +1190,10 @@ export function OrdersPage(): React.ReactElement {
         : { type: 'sample', text: '--' },
       'Route': { type: 'address-cell', pickup: depotForOrder(o, clientConfig.depots)?.name ?? o.pickup.label, dropoff: o.dropoff.label },
       'Recipient': { type: 'list-item', title: o.customer, subtext: o.phone },
+      // Depot → drop-off road distance ("4.2 Km"), derived from the same
+      // coordinates the drawer's map draws the route from, so the number can
+      // never contradict the route (Table Column spec §2.4).
+      'Distance': { type: 'sample', text: distanceLabelFor(o) },
       // Mock times until the Configuration spec lands (real stage-clock logic then).
       // Scheduled has no SLA yet; Returned's counter reset on return — both show "—"
       // when Duration surfaces in a mixed view (their own views drop the column).

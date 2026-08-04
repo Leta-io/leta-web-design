@@ -87,6 +87,43 @@ Only two outcomes exist here — On-Time or Delayed — because At Risk cannot a
 
 Neither 2.3.1 nor 2.3.2 applies where Duration is absent entirely (Scheduled, Returned — no running or concluded SLA to show). See Instance A/B column notes.
 
+## 2.4 Distance column *(added 2026-08-04)*
+
+**Present on every order table**, in every status view — dispatchers use depot → drop-off distance to plan routes, decide whom to assign, and judge fulfilment feasibility. It is **not** an optional toggle like Last Updated or Created By.
+
+| Property | Value |
+|---|---|
+| Category | **Utility** — fixed width, never flexible |
+| Width | **90px** |
+| Position | After **Recipient**, before **Duration** |
+| Cell value | `"{n.n} Km"` — one decimal (e.g. `"4.2 Km"`) |
+| Sort | Numeric dimension: **Low to High** / **High to Low** |
+
+**Why 90px and not narrower:** the *header word* sets the width, not the value — `"Distance"` needs ~70px + 12px padding each side, while `"12.4 Km"` is far narrower. 90px is the minimum that renders the header without truncating.
+
+**Position rationale:** placing it after Recipient keeps the three flexible primaries (Driver · Route · Recipient) contiguous and groups Distance with the other fixed fulfilment metrics (Duration, Created), so the fixed/flexible blocking stays clean. It is *not* placed beside Route (its semantic pair) because a fixed column mid-block splits the flexible group.
+
+**Value must derive from the same coordinates the map draws.** Distance is computed from the order's own pickup/drop-off coordinates (great-circle × a road factor), never from an independent source — otherwise the column and the route drawn in the order-detail map can disagree about the same trip.
+
+### 2.4.1 Accepted consequence — the two densest views scroll
+
+Adding a fixed 90px column raises **every** table's minimum width by 90, which pushes two shapes past the 1320px design canvas:
+
+| View | Min before | Min with Distance | At the 1320 canvas |
+|---|---|---|---|
+| Scheduled / Returned | 986 | 1076 | flex-fills |
+| Pending | 1096 | 1186 | flex-fills |
+| Broadcasted | 1186 | 1276 | flex-fills |
+| All | 890 | 980 | flex-fills |
+| **Dispatched** (Instance A) | 1256 | **1346** | **horizontal scroll** |
+| **Finished** | 1266 | **1356** | **horizontal scroll** |
+
+This is **accepted, not a defect** (ruled 2026-08-04): §4.3 already chose scroll-with-pinned-anchors over column-dropping precisely for this, so the dispatched and finished views scroll below their minimums with Order ID pinned left and Actions pinned right.
+
+**Reducing the flexible floors to avoid the scroll was explicitly rejected** — the Recipient floor exists so the recipient phone never truncates (§6), so trimming it to buy 26px would violate a higher-priority rule.
+
+> **Shipped 2026-08-04** — `DISTANCE` in `columnPresets.ts` (`{ label: 'Distance', role: 'utility', width: 90 }`), spliced after Recipient in all six order presets; `distanceKmFor` / `distanceLabelFor` derive from `order.pickup`/`order.dropoff` (the same coordinates `OrderDetailMap` uses); `Distance` added to the `DesktopDropdowns` default sort options with Low-to-High / High-to-Low. Verified live: header cell measures exactly 90px, values span 0.2–16.9 Km, both sort directions order correctly, and the dispatched view enters scroll mode (scrollWidth 1401 > clientWidth 1158) with Actions pinned.
+
 > **Shipped 2026-07-09** (verified against wireframe rows `1295:89475` / `1295:89501` / `1295:95052` / `1295:94737` / `1295:93661`):
 > - **§2.3.1** — `Cell` gained `statusIcon?: 'warning' | 'error'`: a trailing 16px filled `Icon/Warning` (`--icons-warning-default`) / `Icon/Error` (`--icons-error-default`) after the badge at the cell's 8px gap. Duration renders `DurationLabel variant="active"` — the `status` prop colors the time (`on-target` → `--text-default-label`, `at-risk` → `--text-warning-label`, `delayed` → `--text-error-label`).
 > - **§2.3.2** — exactly the pre-existing `DurationLabel variant="finished"`: `Icon/Check-Circle` (`--icons-success-default`) for Within OFT, `Icon/Cancel-Circle` (`--icons-error-default`) for Beyond OFT, time always `--text-disabled-label`. Status cell gets no `statusIcon`.

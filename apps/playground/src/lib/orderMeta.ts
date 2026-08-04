@@ -132,6 +132,34 @@ export function mockDurationFor(o: Order, sla: SlaState, finished: boolean): str
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${total % 60}s`;
 }
 
+// ── Distance (Table Column spec §2.4) ────────────────────────────────────────
+/**
+ * Depot → drop-off distance in km, derived from the **same coordinates
+ * `OrderDetailMap` draws the route from** (`order.pickup` / `order.dropoff`), so
+ * the Distance column can never contradict the route on the map. Great-circle
+ * distance scaled by a road factor, since a courier drives streets rather than
+ * the straight line.
+ */
+const ROAD_FACTOR = 1.35;
+
+export function distanceKmFor(order: Order): number {
+  const { pickup, dropoff } = order;
+  if (!pickup || !dropoff) return 0;
+  const R = 6371; // km
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(dropoff.lat - pickup.lat);
+  const dLng = toRad(dropoff.lng - pickup.lng);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(pickup.lat)) * Math.cos(toRad(dropoff.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a)) * ROAD_FACTOR;
+}
+
+/** "4.2 Km" — the Distance cell's display value (one decimal, per the spec). */
+export function distanceLabelFor(order: Order): string {
+  return `${distanceKmFor(order).toFixed(1)} Km`;
+}
+
 // ── Client-scoped pickup depot ────────────────────────────────────────────────
 // A seed order's depot may not belong to the active client; remap it
 // deterministically onto one of the client's own depots (stable per order id).
