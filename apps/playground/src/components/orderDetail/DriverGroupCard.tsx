@@ -21,17 +21,23 @@ import { prefersReducedMotion, useBroadcastSignalIcon } from './broadcastSignal.
  * the tenant admin configured — not a hardcoded three-tier assumption.
  */
 
-/** The escalation footnote — depends on where this group sits in the ladder. */
+/**
+ * The escalation footnote — depends on where this group sits in the ladder.
+ * The window a group broadcasts for is `acceptanceWindow × retries` (each retry
+ * re-runs the same acceptance window). Copy is phrased condition-first and in
+ * active voice ("If no driver accepts within Ns, …") — clearer and friendlier
+ * than the old passive "Escalates to … after Ns if the broadcast is unaccepted."
+ */
 function escalationCopy(group: DriverGroup, ladder: DriverGroup[], fallbackEnabled: boolean): string {
   const next = ladder.find((g) => g.priority === group.priority + 1);
   const seconds = group.acceptanceWindowSeconds * Math.max(1, group.retries);
   if (next) {
-    return `Escalates to ${next.name} (P${next.priority}) after ${seconds} seconds if the broadcast is unaccepted.`;
+    return `If no driver accepts within ${seconds} seconds, the order escalates to ${next.name} (P${next.priority}).`;
   }
   // Last group in the ladder: either the fallback sweep or a re-run from P1.
   return fallbackEnabled
-    ? `All available drivers near the depot will receive the broadcast after ${seconds} seconds if unaccepted.`
-    : `Broadcast will re-run from P1 after ${seconds} seconds if unaccepted.`;
+    ? `If no driver accepts within ${seconds} seconds, the order is broadcast to all available drivers near the depot.`
+    : `If no driver accepts within ${seconds} seconds, the broadcast re-runs from P1.`;
 }
 
 let stylesInjected = false;
@@ -103,9 +109,17 @@ export function DriverGroupCard({
   // with the timeline's live "Broadcasting" badge so both read as one animation.
   const signalIcon = useBroadcastSignalIcon(broadcasting);
 
-  // Progress bar fills linearly over one full acceptance window, then loops —
-  // each loop reads as one retry attempt (Retries: N in the metrics below).
-  const progressPct = Math.min(100, ((elapsed % meta.acceptanceWindowSeconds) / meta.acceptanceWindowSeconds) * 100);
+  // Realistic broadcast timing: the bar fills over ONE acceptance window, then
+  // restarts — one sawtooth per retry. After `retries` full cycles the group's
+  // window is exhausted (it would escalate per the banner below), so the bar
+  // holds at 100%. `retries` cycles × window seconds = the escalation time the
+  // banner quotes.
+  const cycles = Math.max(1, meta.retries);
+  const totalWindow = meta.acceptanceWindowSeconds * cycles;
+  const progressPct =
+    elapsed >= totalWindow
+      ? 100
+      : ((elapsed % meta.acceptanceWindowSeconds) / meta.acceptanceWindowSeconds) * 100;
 
   return (
     <div
@@ -120,8 +134,8 @@ export function DriverGroupCard({
         overflow: 'hidden',
       }}
     >
-      {/* Accent bar — pinned to the very top edge of the card, full width,
-          filling in step with `elapsed` (not a decorative pulse). */}
+      {/* Accent bar — a rounded loading bar pinned to the top edge, filling in
+          step with `elapsed` (one sawtooth per retry). Rounded ends per design. */}
       {broadcasting && (
         <div
           style={{
@@ -131,6 +145,7 @@ export function DriverGroupCard({
             height: 4,
             width: `${progressPct}%`,
             backgroundColor: 'var(--icons-information-default)',
+            borderRadius: 'var(--rounding-round)',
             transition: 'width 1s linear',
           }}
         />
@@ -190,9 +205,9 @@ export function DriverGroupCard({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)', padding: 'var(--padding-20px)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)' }}>
           <MetricRow label="Acceptance window" value={meta.acceptanceWindow} icon="Timer" />
+          <MetricRow label="Retries" value={String(meta.retries)} icon="Redo" />
           <MetricRow label="Max orders" value={String(meta.maxOrders)} icon="Orders" />
           <MetricRow label="Total drivers" value={String(meta.totalDrivers)} icon="Account" />
-          <MetricRow label="Retries" value={String(meta.retries)} />
         </div>
         <NotificationBanner type="neutral" variant="filled" description={meta.escalation} />
       </div>

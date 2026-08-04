@@ -74,14 +74,18 @@ function animateScrollTop(el: HTMLElement, top: number, duration = 320): void {
 }
 
 /** Ticks a counter up once per second while `active` (Broadcast summary's "elapsed"
- *  reading, live only while a broadcast is actually running). */
-function useElapsedTicker(initialSeconds: number, active: boolean): number {
+ *  reading + the status-card sequence bar, live only while a broadcast is running).
+ *  Bumping `resetKey` restarts the count from `initialSeconds` — used when the
+ *  dispatcher re-broadcasts (the sequence, and its progress bar, start over). */
+function useElapsedTicker(initialSeconds: number, active: boolean, resetKey = 0): number {
   const [n, setN] = React.useState(initialSeconds);
   React.useEffect(() => {
+    setN(initialSeconds);
     if (!active) return;
     const t = setInterval(() => setN((s) => s + 1), 1000);
     return () => clearInterval(t);
-  }, [active]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, resetKey]);
   return n;
 }
 
@@ -149,19 +153,36 @@ function BroadcastStatusCard({
   onBatchedOrders: () => void;
   onRebroadcast: () => void;
 }): React.ReactElement {
-  // Live ticking — the summary's elapsed reading (only while a broadcast is
-  // actually running; concluded states stay static). On Hold's countdown
-  // isn't ticked here — it's handed down already-live from the drawer.
-  const elapsedSeconds = useElapsedTicker(model.summary.elapsedSeconds, model.liveElapsed);
+  // Re-broadcast restarts the sequence → its elapsed clock (and the status-card
+  // progress bar) start over. `rebroadcastNonce` bumps the ticker's reset key.
+  const [rebroadcastNonce, setRebroadcastNonce] = React.useState(0);
+  // Live ticking — the summary's elapsed reading + the sequence progress bar
+  // (only while a broadcast is actually running; concluded states stay static).
+  // On Hold's countdown isn't ticked here — it's handed down from the drawer.
+  const elapsedSeconds = useElapsedTicker(model.summary.elapsedSeconds, model.liveElapsed, rebroadcastNonce);
   const holdMinutes = holdMinutesRemaining ?? model.holdMinutesBase ?? 1;
   const displayTitle =
     model.state === 'on-hold' ? `Broadcast starts in ${holdMinutes} minute${holdMinutes === 1 ? '' : 's'}` : model.title;
+
+  // The status-card bar is the WHOLE-SEQUENCE progress (round 1 → round N →
+  // fallback), advancing as the sequence elapses. When the model exposes the
+  // sequence total, drive the bar live off `elapsed / total`; otherwise fall
+  // back to the model's static fill.
+  const progressPct =
+    model.sequenceTotalSeconds != null
+      ? Math.min(100, (elapsedSeconds / model.sequenceTotalSeconds) * 100)
+      : model.progressPct;
+
+  const handleRebroadcast = () => {
+    setRebroadcastNonce((n) => n + 1); // restart the sequence clock + bar
+    onRebroadcast();
+  };
 
   // Exhausted splices a "Re-broadcast" Plain button inline into the sentence.
   const subtextNode = model.showRebroadcastLink ? (
     <>
       {model.subtext}{' '}
-      <Button variant="plain" size="medium" onClick={onRebroadcast}>
+      <Button variant="plain" size="medium" onClick={handleRebroadcast}>
         Re-broadcast
       </Button>{' '}
       to try again.
@@ -222,7 +243,7 @@ function BroadcastStatusCard({
               )
             }
             subtext={subtextNode}
-            progressValue={model.progressPct ?? 0}
+            progressValue={progressPct ?? 0}
             // The wireframe's instance binds `Type: System Process` — the blue bar.
             progressVariant="system-process"
             showProgressHelperText={false}

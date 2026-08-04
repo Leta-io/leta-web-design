@@ -101,6 +101,15 @@ export interface BroadcastModel {
   subtext: string;
   /** Fill % for the status card's progress indicator; null hides the bar. */
   progressPct: number | null;
+  /**
+   * Total wall-clock seconds the whole broadcast sequence takes — pre-offer (if
+   * enabled) + every group's `acceptanceWindow × retries` across all rounds +
+   * the fallback round (if enabled). The status-card bar advances live as
+   * `summary.elapsedSeconds / sequenceTotalSeconds`, so the bar tracks how far
+   * the sequence has progressed (round 1 → round N → fallback). Null when there
+   * is no live sequence (no bar).
+   */
+  sequenceTotalSeconds: number | null;
   /** Manual-assignment card (both manual states) — rendered above the broadcast card. */
   manualAssignment: { driverName: string; time: string } | null;
   /** Exhausted only: the inline "Re-broadcast" link inside the subtext. */
@@ -199,6 +208,23 @@ function fmtStamp(base: Date, minuteOffset: number): string {
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${h}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
+}
+
+/** Round-1 pre-offer lead + fallback-sweep windows (must match the leg builder). */
+const PRE_OFFER_SECONDS = 20;
+const FALLBACK_SECONDS = 40;
+
+/**
+ * Total wall-clock seconds one broadcast sequence runs: the round-1 pre-offer
+ * lead (if enabled), then every group's `acceptanceWindow × retries` across all
+ * `rounds`, then the fallback sweep (if enabled). Drives the status-card bar's
+ * live fill (`elapsed / total`).
+ */
+function sequenceTotalSeconds(config: DepotBroadcastConfig): number {
+  const perRound = config.groups.reduce((s, g) => s + g.acceptanceWindowSeconds * Math.max(1, g.retries), 0);
+  const preOffer = config.preOfferEnabled ? PRE_OFFER_SECONDS : 0;
+  const fallback = config.fallbackEnabled ? FALLBACK_SECONDS : 0;
+  return Math.max(1, preOffer + perRound * Math.max(1, config.rounds) + fallback);
 }
 
 // ── Which state does this order sit in? ─────────────────────────────────────────
@@ -571,6 +597,9 @@ export function buildBroadcastModel(
     badge,
     subtext,
     progressPct,
+    // Only the live states drive a moving bar (progressPct != null); the rest
+    // have no sequence-progress bar.
+    sequenceTotalSeconds: progressPct != null && config ? sequenceTotalSeconds(config) : null,
     manualAssignment,
     showRebroadcastLink,
     banner,
