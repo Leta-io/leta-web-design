@@ -182,7 +182,10 @@ function BatchedOrdersScreen({ model, depotName, order }: { model: BroadcastMode
         query={query}
         onQuery={setQuery}
       />
-      <Table columns={BATCH_COLUMNS} rows={filtered} selectable={false} scrollX="auto" />
+      {/* `complex` (80px) rows — same density as the main Orders table; the
+          address cell needs the two-line height, and a shorter `basic` row was
+          the reported height mismatch. */}
+      <Table columns={BATCH_COLUMNS} rows={filtered} selectable={false} scrollX="auto" rowVariant="complex" />
     </div>
   );
 }

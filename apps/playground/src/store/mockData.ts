@@ -566,6 +566,102 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
   },
 ];
 
+// ── Bulk generation ─────────────────────────────────────────────────────────
+// Every status is populated with a production-scale volume (20–100 rows) so the
+// prototype's tables, pagination, filtering, bulk selection, and Dispatch Logs
+// feel real. Purely seeded (no Math.random) so IDs/data stay stable across
+// reloads. The hand-authored RAW_ORDERS above stay first (they carry the
+// explicit broadcast-state fixtures the review screens depend on); these are
+// appended on top.
+
+const GEN_CUSTOMERS = [
+  'Naivas Junction', 'Carrefour Sarit', 'QuickMart Ngong', 'Chandarana Kileleshwa', 'Artcaffe Garden City',
+  'Java House Karen', 'Healthy U Village', 'Goodlife Kasarani', 'Text Book Centre CBD', 'Tuskys Embakasi',
+  'Wanjiku Njeri', 'Daniel Kiptoo', 'Aisha Abdallah', 'Collins Otieno', 'Naomi Chebet', 'Ibrahim Farah',
+  'Lydia Muthoni', 'George Wafula', 'Cynthia Adhiambo', 'Martin Kariuki', 'Esther Nyambura', 'Victor Omollo',
+  'Halima Yusuf', 'Dennis Mwenda', 'Rose Wangari', 'Patrick Ochieng', 'Zainab Ali', 'Kelvin Mutiso',
+  'Sarah Wambui', 'Joseph Barasa', 'Mercy Njoki', 'Anthony Gitau', 'Faith Chepkoech', 'Brian Kiplangat',
+  'Sylvia Achieng', 'Douglas Maina', 'Rehema Said', 'Peter Njuguna', 'Grace Auma', 'Simon Kimani',
+];
+
+// Depot → drop-off pairs (Acme config depot names so `depotForOrder` resolves;
+// the broadcasting depots come first so broadcast-derived states have config).
+const GEN_ROUTES: { depot: string; pickup: Order['pickup']; dropoff: Order['dropoff'] }[] = [
+  { depot: 'CBD Pickup Point', pickup: { label: 'Moi Ave, Nairobi CBD', lat: -1.2864, lng: 36.8172 }, dropoff: { label: 'Kilimani, Nairobi', lat: -1.29, lng: 36.785 } },
+  { depot: 'Westlands Fulfillment Hub', pickup: { label: '23 Ring Rd, Westlands', lat: -1.2675, lng: 36.808 }, dropoff: { label: 'Lavington, Nairobi', lat: -1.279, lng: 36.766 } },
+  { depot: 'Arc Kitisuru Depot', pickup: { label: '13 Plums Lane Ave, Kitisuru', lat: -1.229, lng: 36.79 }, dropoff: { label: 'Runda Estate, Nairobi', lat: -1.218, lng: 36.815 } },
+  { depot: 'CBD Pickup Point', pickup: { label: 'Moi Ave, Nairobi CBD', lat: -1.2864, lng: 36.8172 }, dropoff: { label: 'Karen, Nairobi', lat: -1.32, lng: 36.71 } },
+  { depot: 'Westlands Fulfillment Hub', pickup: { label: '23 Ring Rd, Westlands', lat: -1.2675, lng: 36.808 }, dropoff: { label: 'Parklands Plaza, Nairobi', lat: -1.262, lng: 36.82 } },
+  { depot: 'Kilimani Dispatch Hub', pickup: { label: '5 Argwings Kodhek Rd, Kilimani', lat: -1.293, lng: 36.785 }, dropoff: { label: 'Yaya Centre, Kilimani', lat: -1.293, lng: 36.786 } },
+  { depot: 'Arc Kitisuru Depot', pickup: { label: '13 Plums Lane Ave, Kitisuru', lat: -1.229, lng: 36.79 }, dropoff: { label: 'Gigiri, Nairobi', lat: -1.2351, lng: 36.8065 } },
+  { depot: 'CBD Pickup Point', pickup: { label: 'Moi Ave, Nairobi CBD', lat: -1.2864, lng: 36.8172 }, dropoff: { label: 'Donholm, Nairobi', lat: -1.29, lng: 36.88 } },
+  { depot: 'Westlands Fulfillment Hub', pickup: { label: '23 Ring Rd, Westlands', lat: -1.2675, lng: 36.808 }, dropoff: { label: 'Spring Valley, Nairobi', lat: -1.252, lng: 36.79 } },
+  { depot: 'Kilimani Dispatch Hub', pickup: { label: '5 Argwings Kodhek Rd, Kilimani', lat: -1.293, lng: 36.785 }, dropoff: { label: 'Langata, Nairobi', lat: -1.325, lng: 36.74 } },
+];
+
+const GEN_PACKAGES = ['Grocery delivery', 'Bakery order', 'Prescription medicines', 'Catering order', 'Electronics', 'Supplements', 'Stationery', 'Cosmetics', 'Fresh produce', 'Home supplies'];
+const GEN_DRIVER_IDS = MOCK_DRIVERS.map((d) => d.id);
+const STANDARD_PHONE_PREFIX = '+254 7';
+
+/** Statuses where a driver is on the order (so a driverId + trip is assigned). */
+const GEN_DRIVER_STATUSES = new Set<Order['status']>(['assigned', 'at-depot', 'in-transit', 'arrived', 'returning', 'delivered']);
+/** Depots configured to broadcast — used for auto-broadcast-origin statuses. */
+const GEN_BROADCAST_DEPOTS = GEN_ROUTES.filter((r) => r.depot !== 'Kilimani Dispatch Hub');
+
+/**
+ * Generates `count` deterministic orders for one status. `seed0` offsets the
+ * PRNG so each status block draws a distinct-but-stable slice of the pools.
+ */
+function genOrders(status: Order['status'], count: number, seed0: number): Omit<Order, 'id'>[] {
+  const out: Omit<Order, 'id'>[] = [];
+  const hasDriver = GEN_DRIVER_STATUSES.has(status);
+  // Auto-broadcast-origin states must sit on a broadcasting depot for their
+  // Dispatch Logs to build a real sequence.
+  const wantsBroadcastDepot = status === 'broadcasted' || status === 'pending';
+  for (let k = 0; k < count; k++) {
+    const s = seed0 + k;
+    const route = wantsBroadcastDepot ? GEN_BROADCAST_DEPOTS[s % GEN_BROADCAST_DEPOTS.length]! : GEN_ROUTES[s % GEN_ROUTES.length]!;
+    const customer = GEN_CUSTOMERS[s % GEN_CUSTOMERS.length]!;
+    const hh = String(6 + (s % 14)).padStart(2, '0');
+    const mm = String((s * 7) % 60).padStart(2, '0');
+    const phone = `${STANDARD_PHONE_PREFIX}${String(10 + (s % 89))} ${String(100 + (s % 900))} ${String(100 + ((s * 3) % 900))}`;
+    const cancelledWithDriver = status === 'cancelled' && s % 2 === 0;
+    out.push({
+      customer,
+      phone,
+      depot: route.depot,
+      pickup: route.pickup,
+      dropoff: route.dropoff,
+      package: GEN_PACKAGES[s % GEN_PACKAGES.length]!,
+      items: 1 + (s % 8),
+      status,
+      driverId: hasDriver || cancelledWithDriver ? GEN_DRIVER_IDS[s % GEN_DRIVER_IDS.length]! : null,
+      ...(status === 'broadcasted' ? { batchId: `BC-${4000 + (s % 900)}` } : null),
+      createdAt: `2026-06-29T${hh}:${mm}:00`,
+      priority: s % 3 === 0 ? 'express' : 'standard',
+    });
+  }
+  return out;
+}
+
+// Per-status generated volume (each lands within the 20–100 band once the few
+// hand-authored fixtures above are added in).
+const GENERATED_ORDERS: Omit<Order, 'id'>[] = [
+  ...genOrders('scheduled', 45, 1000),
+  ...genOrders('pending', 38, 2000),
+  ...genOrders('broadcasted', 30, 3000),
+  ...genOrders('returned', 26, 4000),
+  ...genOrders('assigned', 40, 5000),
+  ...genOrders('at-depot', 28, 6000),
+  ...genOrders('in-transit', 46, 7000),
+  ...genOrders('returning', 24, 8000),
+  ...genOrders('arrived', 28, 9000),
+  ...genOrders('delivered', 60, 10000),
+  ...genOrders('cancelled', 45, 11000),
+];
+
+const ALL_RAW_ORDERS: Omit<Order, 'id'>[] = [...RAW_ORDERS, ...GENERATED_ORDERS];
+
 /**
  * Orders with deterministic, varied-length LETA unique IDs (see {@link makeOrderId}).
  * A trip exists once a driver was assigned — so every seeded order WITH a driver
@@ -574,7 +670,7 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
  * `driverId: null`) carry no trip; their Trip cell renders "--" per the
  * Cancelled-table wireframe (`1213:98975`).
  */
-export const MOCK_ORDERS: Order[] = RAW_ORDERS.map((o, i) => ({
+export const MOCK_ORDERS: Order[] = ALL_RAW_ORDERS.map((o, i) => ({
   id: makeOrderId(i),
   ...(o.driverId ? { tripId: `TRP-${101 + (i % 8)}` } : null),
   ...o,

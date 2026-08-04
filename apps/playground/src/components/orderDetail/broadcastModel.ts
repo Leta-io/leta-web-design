@@ -482,8 +482,12 @@ export function buildBroadcastModel(
       title = `Broadcast starts in ${holdMinutesBase} minute${holdMinutesBase === 1 ? '' : 's'}`;
       subtext = 'When the hold window closes, the broadcast will run through all priority groups.';
       banner = { kind: 'assign-driver', text: 'Assign a driver to this order before broadcast begins.' };
-      emptyDescription =
-        'Dispatch manually now to bypass auto-broadcast. Once the window closes, the system will start notifying riders.';
+      // SAAS / managed-fleet gets the auto-broadcast-specific copy (updated in
+      // Figma 526:52830, 2026-08-04); marketplace tenants have no broadcast
+      // sequence, so they get the generic placeholder.
+      emptyDescription = marketplace
+        ? 'All broadcast logs will be displayed here'
+        : 'Dispatch manually now to bypass auto-broadcast. Once the hold window closes, drivers will receive order broadcasts.';
       break;
     }
     case 'broadcasting': {

@@ -444,9 +444,41 @@ function DrawerBody({
     () => buildBroadcastModel(order, client, model.depot, driver?.name ?? null),
     [order, client, model.depot, driver?.name],
   );
-  // Dispatch Logs drill-down: replaces the whole drawer content (own header, no
-  // footer). Null = the main Dispatch Logs screen. Resets when leaving the tab.
+  // Dispatch Logs drill-down (Batched Orders / Priority Driver Groups /
+  // Notified Drivers). Rather than swapping the drawer body in place, the
+  // drill-down is a SECOND panel that **slides in over the parent drawer** —
+  // the same side-sheet choreography as opening the drawer itself (ruled
+  // 2026-08-04). `drill` holds the active screen (kept set through the
+  // slide-out so its content stays rendered while it animates away);
+  // `drillEntered`/`drillClosing` drive the transform, mirroring the parent's
+  // `entered`/`closing`.
   const [drill, setDrill] = React.useState<DrillDown | null>(null);
+  const [drillEntered, setDrillEntered] = React.useState(false);
+  const [drillClosing, setDrillClosing] = React.useState(false);
+  const drillCloseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Double rAF so the initial (offscreen) transform paints before `entered`
+  // flips — same reason the drawer/dialog slide-ins need it.
+  React.useEffect(() => {
+    if (!drill || drillClosing) return;
+    let r2 = 0;
+    const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setDrillEntered(true)); });
+    return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); };
+  }, [drill, drillClosing]);
+  const openDrill = (d: DrillDown) => {
+    if (drillCloseTimer.current) { clearTimeout(drillCloseTimer.current); drillCloseTimer.current = null; }
+    setDrillClosing(false);
+    setDrillEntered(false);
+    setDrill(d);
+  };
+  const closeDrill = () => {
+    if (!drill || drillClosing) return;
+    setDrillClosing(true);
+    drillCloseTimer.current = setTimeout(() => {
+      setDrill(null);
+      setDrillEntered(false);
+      setDrillClosing(false);
+    }, 320);
+  };
   const status = order.status;
   // Terminal states show the driver card in read-only "view" mode: a single Open
   // button (like the trip card), not the active Change-driver + Call buttons
@@ -465,7 +497,12 @@ function DrawerBody({
   const minutesRemaining = (base: number) => Math.max(1, base - Math.floor(liveSeconds / 60));
   const summarySub = (() => {
     const s = model.summary;
-    if (s.live === 'seconds-elapsed') return `${(s.liveBase ?? 0) + liveSeconds} seconds elapsed.`;
+    // Broadcasted: "{N} drivers notified" — N sourced from the SAME broadcast
+    // model the Dispatch Logs tab uses, so the two never disagree (2026-08-04).
+    if (s.driversNotified) {
+      const n = broadcast.summary.notifiedDrivers;
+      return `${n} driver${n === 1 ? '' : 's'} notified`;
+    }
     if (s.live === 'minutes-until-broadcast' || s.live === 'minutes-to-broadcast') {
       const n = minutesRemaining(s.liveBase ?? 1);
       const unit = n === 1 ? 'minute' : 'minutes';
@@ -528,9 +565,14 @@ function DrawerBody({
   const [commentActive, setCommentActive] = React.useState(commentIntent);
   React.useEffect(() => {
     if (tab !== 1) setCommentActive(false);
-    // Leaving Dispatch Logs abandons any drill-down, so returning lands on its
-    // main screen rather than a stale sub-screen.
-    if (tab !== 2) setDrill(null);
+    // Leaving Dispatch Logs abandons any drill-down (instantly, no slide) so
+    // returning lands on its main screen rather than a stale sub-screen.
+    if (tab !== 2 && drill) {
+      if (drillCloseTimer.current) { clearTimeout(drillCloseTimer.current); drillCloseTimer.current = null; }
+      setDrill(null);
+      setDrillEntered(false);
+      setDrillClosing(false);
+    }
   }, [tab]);
   const isCompleted = status === 'delivered' || status === 'cancelled';
   // Items accordion: once paginated (>5 items), lock the item-rows region to the
@@ -980,33 +1022,8 @@ function DrawerBody({
           fillHeight
           role="dialog"
           aria-label={`Order ${order.id}`}
-          // Escape backs out of a drill-down one level before closing the drawer.
-          onEscape={drill ? () => setDrill(null) : onClose}
+          onEscape={onClose}
           header={
-            drill ? (
-              /* Drill-down header (`526:52839` et al): back arrow + breadcrumb + title,
-                 no secondary content, no tabs. Back returns to Dispatch Logs. */
-              <ModalHeaders
-                variant="default"
-                title={DRILL_TITLE[drill]}
-                onClose={onClose}
-                showNavArrow
-                onNavBack={() => setDrill(null)}
-                showBreadcrumb
-                breadcrumb={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
-                    <Button variant="plain" size="medium" showUnderline={false} onClick={() => setDrill(null)}>
-                      {order.id}
-                    </Button>
-                    <span className="text-label-s-regular" style={{ color: 'var(--text-default-label-idle)' }}>/</span>
-                    <span className="text-label-s-medium" style={{ color: 'var(--text-default-label)' }}>
-                      {DRILL_TITLE[drill]}
-                    </span>
-                  </div>
-                }
-                showSecondaryContent={false}
-              />
-            ) : (
             <ModalHeaders
               variant="with-tabs"
               title={order.id}
@@ -1039,11 +1056,9 @@ function DrawerBody({
                 />
               }
             />
-            )
           }
           footer={
-            // Drill-downs carry no footer (the wireframes end at the body).
-            drill ? null : tab === 1 ? (
+            tab === 1 ? (
               isCompleted ? (
                 <ActivityTerminalNotice />
               ) : (
@@ -1139,13 +1154,11 @@ function DrawerBody({
           }
           bodyStyle={{ backgroundColor: 'var(--surface-neutral-bg-default)' }}
         >
-          {/* Keyed by tab + drill so switching either remounts a fresh node and
-              replays the fade-in — a plain conditional swap has nothing to key
-              off and would only animate once, on first mount. */}
-          <div key={drill ?? `tab-${tab}`} className="leta-tab-body-enter" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-          {drill ? (
-            <DispatchLogsDrillDown drill={drill} model={broadcast} depotName={depotName} order={order} />
-          ) : tab === 0 && showSkeleton ? (
+          {/* Keyed by tab so a tab switch remounts a fresh node and replays the
+              fade-in. The drill-down is NOT rendered here — it slides in as a
+              separate overlay panel below. */}
+          <div key={`tab-${tab}`} className="leta-tab-body-enter" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+          {tab === 0 && showSkeleton ? (
             <DrawerSkeleton />
           ) : tab === 0 ? (
             overviewBody
@@ -1156,15 +1169,69 @@ function DrawerBody({
               model={broadcast}
               holdMinutesRemaining={holdMinutesRemaining}
               onViewActivity={() => setTab(1)}
-              onPriorityGroups={() => setDrill('priority-groups')}
-              onBatchedOrders={() => setDrill('batched-orders')}
-              onNotifiedDrivers={() => setDrill('notified-drivers')}
+              onPriorityGroups={() => openDrill('priority-groups')}
+              onBatchedOrders={() => openDrill('batched-orders')}
+              onNotifiedDrivers={() => openDrill('notified-drivers')}
               onRebroadcast={() => actions.stub('Re-broadcast')}
               onDispatch={() => actions.dispatch(order.id)}
             />
           )}
           </div>
         </ModalShell>
+
+        {/* Drill-down overlay — slides in over the parent drawer (same side-sheet
+            motion as opening the drawer). Its own ModalShell provides the
+            back-arrow + breadcrumb header and no footer; kept mounted through the
+            slide-out. */}
+        {drill && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 2,
+              transform: drillEntered && !drillClosing ? 'translateX(0)' : 'translateX(100%)',
+              transition: drillClosing
+                ? 'transform 220ms cubic-bezier(0.4, 0, 1, 1)'
+                : 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)',
+              willChange: 'transform',
+            }}
+          >
+            <ModalShell
+              width={768}
+              rounded={false}
+              fillHeight
+              role="dialog"
+              aria-label={DRILL_TITLE[drill]}
+              onEscape={closeDrill}
+              header={
+                <ModalHeaders
+                  variant="default"
+                  title={DRILL_TITLE[drill]}
+                  onClose={onClose}
+                  showNavArrow
+                  onNavBack={closeDrill}
+                  showBreadcrumb
+                  breadcrumb={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
+                      <Button variant="plain" size="medium" showUnderline={false} onClick={closeDrill}>
+                        {order.id}
+                      </Button>
+                      <span className="text-label-s-regular" style={{ color: 'var(--text-default-label-idle)' }}>/</span>
+                      <span className="text-label-s-medium" style={{ color: 'var(--text-default-label)' }}>
+                        {DRILL_TITLE[drill]}
+                      </span>
+                    </div>
+                  }
+                  showSecondaryContent={false}
+                />
+              }
+              footer={null}
+              bodyStyle={{ backgroundColor: 'var(--surface-neutral-bg-default)' }}
+            >
+              <DispatchLogsDrillDown drill={drill} model={broadcast} depotName={depotName} order={order} />
+            </ModalShell>
+          </div>
+        )}
       </div>
 
       {/* Footer ⋯ overflow (§12.7; Returned drops Update Status per v2.8). */}

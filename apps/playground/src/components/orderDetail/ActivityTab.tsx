@@ -19,6 +19,7 @@ import { activityTimestamp, type ActivityBodyBlock, type ActivityItem, type Titl
 import { CURRENT_USER } from '../../store/currentUser.js';
 import type { ProofFile } from './detailModel.js';
 import { renderRichText } from '../../lib/richText.js';
+import { DashedLine } from '../DashedLine.js';
 
 /**
  * Activity tab (Order Detail drawer) — the local "Activity" entry component
@@ -320,26 +321,11 @@ function ActivityRow({
     <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 32 }}>
         <EntryLeading item={item} />
-        {/* Figma `Line`: VECTOR, strokeWeight 1, dashPattern [6, 6], centered in the
-            32px column. A `repeating-linear-gradient` on a 1px-wide div reproduces
-            the exact 6/6 rhythm but rendered visibly faint — reported and reproduced:
-            a hairline element positioned at a fractional CSS pixel anti-aliases
-            across two device-pixel columns, washing out the color regardless of the
-            gradient's own hard stops. A native dashed `border-left` doesn't hit that
-            failure mode (browsers rasterize border dashes without the extra
-            anti-aliasing pass a background gradient gets) at the cost of an
-            approximate, browser-chosen dash length rather than an exact 6/6.
+        {/* Figma `Line`: VECTOR, strokeWeight 1, dashPattern [6, 6], round caps,
+            centered in the 32px column. Rendered via the shared {@link DashedLine}
+            (SVG round-capped stroke) — the prototype-wide dashed-line convention.
             Omitted on the last row (Figma's creation variants have no Line child). */}
-        {!isLast && (
-          <div
-            style={{
-              flex: '1 0 0',
-              width: 0,
-              minHeight: 12,
-              borderLeft: 'var(--stroke-xs) dashed var(--border-neutral-default)',
-            }}
-          />
-        )}
+        {!isLast && <DashedLine style={{ flex: '1 0 0', minHeight: 12 }} />}
       </div>
       <div
         style={{

@@ -11,6 +11,7 @@ import { Icon } from '@leta/icons';
 import { BroadcastEventAccordion } from './BroadcastEventAccordion.js';
 import { formatDuration, type BroadcastLeg, type BroadcastModel } from './broadcastModel.js';
 import { useBroadcastSignalIcon } from './broadcastSignal.js';
+import { DashedLine } from '../DashedLine.js';
 
 /**
  * Dispatch Logs tab — the main screen (OM §7.5). Renders all seven wireframed
@@ -264,15 +265,15 @@ function BroadcastStatusCard({
 }
 
 /** Outcome badge per leg — matches the wireframes' Desktop Badge instances.
- *  Unaccepted's Clock renders outlined (Figma); Broadcasting's signal bars and
- *  Accepted's Check-Circle are filled, per the same wireframes. */
+ *  Unaccepted uses the outlined **Deactivate** icon (Figma); Broadcasting's
+ *  signal bars and Accepted's Check-Circle are filled, per the same wireframes. */
 const OUTCOME_BADGE: Record<
   BroadcastLeg['outcome'],
-  { label: string; color: 'information' | 'success' | 'neutral'; icon?: 'Signal-3-Bars' | 'Check-Circle' | 'Clock'; outlined?: boolean }
+  { label: string; color: 'information' | 'success' | 'neutral'; icon?: 'Signal-3-Bars' | 'Check-Circle' | 'Deactivate'; outlined?: boolean }
 > = {
   broadcasting: { label: 'Broadcasting', color: 'information', icon: 'Signal-3-Bars' },
   accepted: { label: 'Accepted', color: 'success', icon: 'Check-Circle' },
-  unaccepted: { label: 'Unaccepted', color: 'neutral', icon: 'Clock', outlined: true },
+  unaccepted: { label: 'Unaccepted', color: 'neutral', icon: 'Deactivate', outlined: true },
 };
 
 /**
@@ -347,21 +348,6 @@ function AcceptedRow({ acceptedBy }: { acceptedBy: NonNullable<BroadcastLeg['acc
 }
 
 /**
- * A dashed connector segment — Figma's `518:63890` "Line" vectors are a real
- * SVG stroke (`#E3E3E3`, dasharray `6 6`, round caps), which a CSS
- * `repeating-linear-gradient` on a 1px-wide div only approximates: the
- * gradient's hard color stops anti-alias against the div's own edges, so the
- * dashes render visibly washed out rather than the token's true opacity
- * (confirmed faint on screen — reported and reproduced). A native dashed
- * `border-left` doesn't have that failure mode — browsers rasterize border
- * dashes without the extra anti-aliasing pass a background gradient gets.
- */
-const DASH_LINE: React.CSSProperties = {
-  width: 0,
-  borderLeft: 'var(--stroke-xs) dashed var(--border-neutral-default)',
-};
-
-/**
  * One timeline entry. Per Figma `518:63890` ("Timeline Activity"), the Branch column
  * (dot + dashed line) runs beside the row's **full** content — the optional round
  * marker *and* the card — not just beside the card. That's what keeps the dash
@@ -407,11 +393,15 @@ function TimelineEntry({
   return (
     <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 12, gap: 4 }}>
-        <div style={{ ...( !isFirst ? DASH_LINE : { width: 0 } ), flexShrink: 0, height: circleOffset - 4 }} />
+        {!isFirst ? (
+          <DashedLine style={{ height: circleOffset - 4 }} />
+        ) : (
+          <div style={{ width: 0, height: circleOffset - 4 }} />
+        )}
         <span style={{ display: 'flex', color: 'var(--icons-neutral-idle)', flexShrink: 0 }}>
           <Icon name="Circle-Large" size={12} />
         </span>
-        {!isLast && <div style={{ ...DASH_LINE, flex: '1 0 0', minHeight: 12 }} />}
+        {!isLast && <DashedLine style={{ flex: '1 0 0', minHeight: 12 }} />}
       </div>
       <div data-leg-index={legIndex} style={{ display: 'flex', flexDirection: 'column', flex: '1 0 0', minWidth: 0, paddingBottom: 'var(--padding-40px)' }}>
         {marker && <RoundMarker label={marker} onOlder={onMarkerOlder} onNewer={onMarkerNewer} />}

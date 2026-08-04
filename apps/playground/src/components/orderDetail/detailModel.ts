@@ -111,10 +111,18 @@ export interface OrderDetailModel {
     sub: string;
     cta: 'view-activity' | 'dispatch' | 'view-logs';
     ctaLabel: string;
-    /** live-updating sub-copy kind (broadcast seconds / countdown minutes). */
-    live?: 'seconds-elapsed' | 'minutes-until-broadcast' | 'minutes-to-broadcast';
+    /** live-updating sub-copy kind (countdown minutes). */
+    live?: 'minutes-until-broadcast' | 'minutes-to-broadcast';
     /** starting value for the live number. */
     liveBase?: number;
+    /**
+     * Broadcasted state: the sub-copy is "{N} drivers notified", where N is the
+     * broadcast model's notified-driver count (so the Overview card and the
+     * Dispatch Logs tab always agree — ruled 2026-08-04, replacing the old
+     * "{N} seconds elapsed" which drifted from the tab). The drawer fills N in
+     * from the broadcast model; the static `sub` here is a fallback.
+     */
+    driversNotified?: boolean;
   };
   /** Region flags */
   showPickupCode: boolean;
@@ -233,7 +241,7 @@ export function buildOrderDetail(
           ? { main: 'Order broadcasting soon', sub: `${(h % Math.max(config.orderWaitMinutes, 2)) + 1} minute${(h % Math.max(config.orderWaitMinutes, 2)) + 1 === 1 ? '' : 's'} to broadcast.`, live: 'minutes-to-broadcast', liveBase: (h % Math.max(config.orderWaitMinutes, 2)) + 1, ...viewActivity }
           : { main: 'Dispatch Now', sub: 'Items ready for delivery.', cta: 'dispatch', ctaLabel: 'Dispatch' };
       case 'broadcasted':
-        return { main: 'Order broadcast started', sub: `${(h % 50) + 5} seconds elapsed.`, cta: 'view-logs', ctaLabel: 'View Logs', live: 'seconds-elapsed', liveBase: (h % 50) + 5 };
+        return { main: 'Order broadcast started', sub: 'Drivers notified', cta: 'view-logs', ctaLabel: 'View Logs', driversNotified: true };
       case 'assigned':
         return { main: 'Driver is on the way', sub: `Est delivery: ${estWindow}`, ...viewActivity };
       case 'at-depot':
