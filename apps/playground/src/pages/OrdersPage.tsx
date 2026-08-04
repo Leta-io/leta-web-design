@@ -315,6 +315,7 @@ export function OrdersPage(): React.ReactElement {
   const updateOrder = useStore((s) => s.updateOrder);
   const assignOrder = useStore((s) => s.assignOrder);
   const cancelOrder = useStore((s) => s.cancelOrder);
+  const rebroadcastOrder = useStore((s) => s.rebroadcastOrder);
   const pushToast = useStore((s) => s.pushToast);
   const addOrder = useStore((s) => s.addOrder);
   // Active client config — drives the Add Order drawer's fields/sections.
@@ -876,6 +877,22 @@ export function OrdersPage(): React.ReactElement {
       cta: { kind: 'view-trip', label: 'View Trip', ...viewFor('assigned') },
     });
     clearSelection();
+  };
+  /**
+   * Dispatcher re-broadcast from the Dispatch Logs tab's Exhausted card. Puts the
+   * order back out on a live sequence (Pending → Broadcasted), which also adds
+   * the "{dispatcher} rebroadcasted the order" Activity entry.
+   */
+  const rebroadcast = (orderId: string) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    rebroadcastOrder(orderId);
+    resolveActionOutcome({
+      orderIds: [orderId],
+      newStatus: 'broadcasted',
+      toastTitle: 'Broadcast restarted',
+      toastSubtitle: 'Drivers are being notified again.',
+    });
   };
   const changeDriver = (orderId: string) => {
     const order = orders.find((o) => o.id === orderId);
@@ -1486,6 +1503,7 @@ export function OrdersPage(): React.ReactElement {
           requestEdit,
           addToTrip,
           changeDriver,
+          rebroadcast: rebroadcast,
           stub: (title) => noop(title),
         }}
       />

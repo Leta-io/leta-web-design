@@ -299,6 +299,12 @@ export interface OrderDetailActions {
   requestEdit: (id: string) => void;
   addToTrip: (id: string) => void;
   changeDriver: (id: string) => void;
+  /**
+   * Re-broadcast after an exhausted sequence. Only reachable from the Dispatch
+   * Logs tab — the Overview card's CTA is "View Logs" precisely because that tab
+   * owns this action (the wireframe's ⋯ menu has no Re-broadcast item).
+   */
+  rebroadcast: (id: string) => void;
   /** Unbuilt actions (Return Order / Add Comment / Recipient Map). */
   stub: (title: string) => void;
 }
@@ -1187,7 +1193,7 @@ function DrawerBody({
               onPriorityGroups={() => openDrill('priority-groups')}
               onBatchedOrders={() => openDrill('batched-orders')}
               onNotifiedDrivers={() => openDrill('notified-drivers')}
-              onRebroadcast={() => actions.stub('Re-broadcast')}
+              onRebroadcast={() => actions.rebroadcast(order.id)}
               onDispatch={() => actions.dispatch(order.id)}
             />
           )}

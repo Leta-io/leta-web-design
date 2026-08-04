@@ -52,6 +52,11 @@ interface StoreState {
   assignOrder: (orderId: string, driverId: string) => void;
   /** Cancel an order, capturing the Cancel Order modal's reason codes + note (OM §11.1). */
   cancelOrder: (id: string, reasons?: string[], note?: string) => void;
+  /**
+   * Dispatcher re-broadcast after an exhausted sequence (OM §7.5): the order goes
+   * back to Broadcasted and a fresh sequence starts running live.
+   */
+  rebroadcastOrder: (id: string) => void;
 
   // --- toasts ---
   pushToast: (toast: Omit<ToastItem, 'id'>) => void;
@@ -131,6 +136,28 @@ export const useStore = create<StoreState>((set, get) => ({
       ),
       drivers: s.drivers.map((d) =>
         d.id === driverId ? { ...d, status: 'busy', currentOrderId: orderId } : d,
+      ),
+    }));
+  },
+
+  rebroadcastOrder: (id) => {
+    // Restarting the sequence puts the order back out on broadcast. The new
+    // sequence's rounds continue the same timeline with no sequence demarcation
+    // (OM §7.5.1), so the batch id is kept; `broadcastStartedAt` restarts the
+    // live escalation clock and `rebroadcastCount` adds the Activity entry.
+    set((s) => ({
+      orders: s.orders.map((o) =>
+        o.id === id
+          ? {
+              ...o,
+              status: 'broadcasted',
+              broadcastStartedAt: Date.now(),
+              rebroadcastCount: (o.rebroadcastCount ?? 0) + 1,
+              // A pinned review fixture must stop pinning once the dispatcher
+              // acts, or the tab would snap back to its seeded shape.
+              broadcastState: undefined,
+            }
+          : o,
       ),
     }));
   },

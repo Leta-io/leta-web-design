@@ -626,6 +626,13 @@ function genOrders(status: Order['status'], count: number, seed0: number): Omit<
     const mm = String((s * 7) % 60).padStart(2, '0');
     const phone = `${STANDARD_PHONE_PREFIX}${String(10 + (s % 89))} ${String(100 + (s % 900))} ${String(100 + ((s * 3) % 900))}`;
     const cancelledWithDriver = status === 'cancelled' && s % 2 === 0;
+    // Roughly a third of Pending orders are back in the queue after a broadcast
+    // sequence went unaccepted. The batch id is the marker that a broadcast
+    // actually ran, so `dispatchNarrative` resolves these to the `exhausted`
+    // Dispatch Logs shape — which is what makes "Broadcast unaccepted" + the
+    // Re-broadcast action reachable while browsing older Pending orders, instead
+    // of only on the single hand-authored fixture.
+    const exhaustedPending = status === 'pending' && s % 3 === 0;
     out.push({
       customer,
       phone,
@@ -636,7 +643,7 @@ function genOrders(status: Order['status'], count: number, seed0: number): Omit<
       items: 1 + (s % 8),
       status,
       driverId: hasDriver || cancelledWithDriver ? GEN_DRIVER_IDS[s % GEN_DRIVER_IDS.length]! : null,
-      ...(status === 'broadcasted' ? { batchId: `BC-${4000 + (s % 900)}` } : null),
+      ...(status === 'broadcasted' || exhaustedPending ? { batchId: `BC-${4000 + (s % 900)}` } : null),
       createdAt: `2026-06-29T${hh}:${mm}:00`,
       priority: s % 3 === 0 ? 'express' : 'standard',
     });

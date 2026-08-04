@@ -243,10 +243,26 @@ export function buildOrderDetail(
           ? { main: fmtDateTimeShort(scheduled), sub: `${minsToBroadcast} minute${minsToBroadcast === 1 ? '' : 's'} until broadcast.`, live: 'minutes-until-broadcast', liveBase: minsToBroadcast, ...viewActivity }
           : { main: fmtDateTimeShort(scheduled), sub: 'Scheduled delivery date', ...viewActivity };
       }
-      case 'pending':
+      case 'pending': {
+        // A Pending order whose broadcast already ran and failed is NOT waiting to
+        // broadcast — it is back in the queue awaiting rescue. Figma
+        // `1759:145797` (Order Overview Card → "Pending Order Overview 3
+        // (Auto-broadcast)"): the copy matches the Dispatch Logs tab's own
+        // Exhausted card, and the CTA routes there because Re-broadcast lives on
+        // that tab (the row/footer ⋯ menu deliberately has no Re-broadcast item).
+        if (narrative.broadcastState === 'exhausted') {
+          return {
+            main: 'Broadcast unaccepted',
+            sub: 'Re-broadcast or dispatch manually.',
+            cta: 'view-logs',
+            ctaLabel: 'View Logs',
+          };
+        }
+        const waitMins = (h % Math.max(config.orderWaitMinutes, 2)) + 1;
         return config.autoBroadcast
-          ? { main: 'Order broadcasting soon', sub: `${(h % Math.max(config.orderWaitMinutes, 2)) + 1} minute${(h % Math.max(config.orderWaitMinutes, 2)) + 1 === 1 ? '' : 's'} to broadcast.`, live: 'minutes-to-broadcast', liveBase: (h % Math.max(config.orderWaitMinutes, 2)) + 1, ...viewActivity }
-          : { main: 'Dispatch Now', sub: 'Items ready for delivery.', cta: 'dispatch', ctaLabel: 'Dispatch' };
+          ? { main: 'Order broadcasting soon', sub: `${waitMins} minute${waitMins === 1 ? '' : 's'} to broadcast.`, live: 'minutes-to-broadcast', liveBase: waitMins, ...viewActivity }
+          : { main: 'Dispatch now', sub: 'Items ready for delivery.', cta: 'dispatch', ctaLabel: 'Dispatch' };
+      }
       case 'broadcasted':
         return { main: 'Order broadcast started', sub: 'Drivers notified', cta: 'view-logs', ctaLabel: 'View Logs', driversNotified: true };
       case 'assigned':

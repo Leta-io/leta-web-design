@@ -201,16 +201,11 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
     });
     prev = 'broadcasted';
 
-    // The sequence went unaccepted and the order dropped back into the queue.
-    // True both for an order sitting in Pending right now and for one the
-    // dispatcher later rescued by hand (manual-after-exhausted).
-    const exhausted =
-      narrative.broadcastState === 'exhausted' ||
-      narrative.broadcastState === 'manual-after-exhausted' ||
-      (narrative.manualStage === 'after-exhausted');
-    if (exhausted) {
+    /** "Broadcasted unaccepted." — the sequence failed and the order fell back
+     *  into the queue (Broadcasted → Pending). */
+    const pushUnaccepted = (key: string) => {
       items.push({
-        id: 'broadcast-unaccepted',
+        id: key,
         leading: { kind: 'icon', icon: 'Update' },
         title: [{ kind: 'text', text: 'Broadcasted unaccepted.' }],
         timestamp: bump(2 + (h % 5)),
@@ -218,10 +213,14 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
         kind: 'event',
       });
       prev = 'pending';
-    }
+    };
 
-    // Each dispatcher re-broadcast restarts the sequence (Pending → Broadcasted).
+    // A re-broadcast only exists because the previous sequence went unaccepted, so
+    // each one is preceded by that event. Without this pairing the trail jumped
+    // straight from "→ Broadcasted" to "Pending → Broadcasted" with nothing
+    // explaining how the order got back to Pending.
     for (let i = 0; i < (order.rebroadcastCount ?? 0); i++) {
+      pushUnaccepted(`broadcast-unaccepted-${i}`);
       items.push({
         id: `rebroadcast-${i}`,
         leading: dispatcherLeading(),
@@ -231,6 +230,13 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
         kind: 'event',
       });
       prev = 'broadcasted';
+    }
+
+    // The order is sitting back in Pending *right now* after an unaccepted
+    // sequence — either awaiting rescue (exhausted) or already rescued by hand
+    // (manual-after-exhausted).
+    if (narrative.broadcastState === 'exhausted' || narrative.manualStage === 'after-exhausted') {
+      pushUnaccepted('broadcast-unaccepted');
     }
   }
 
