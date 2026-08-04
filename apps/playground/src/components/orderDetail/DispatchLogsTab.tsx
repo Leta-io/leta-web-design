@@ -263,11 +263,16 @@ function BroadcastStatusCard({
   );
 }
 
-/** Outcome badge per leg — matches the wireframes' Desktop Badge instances. */
-const OUTCOME_BADGE: Record<BroadcastLeg['outcome'], { label: string; color: 'information' | 'success' | 'neutral'; icon?: 'Signal-3-Bars' | 'Check-Circle' | 'Clock' }> = {
+/** Outcome badge per leg — matches the wireframes' Desktop Badge instances.
+ *  Unaccepted's Clock renders outlined (Figma); Broadcasting's signal bars and
+ *  Accepted's Check-Circle are filled, per the same wireframes. */
+const OUTCOME_BADGE: Record<
+  BroadcastLeg['outcome'],
+  { label: string; color: 'information' | 'success' | 'neutral'; icon?: 'Signal-3-Bars' | 'Check-Circle' | 'Clock'; outlined?: boolean }
+> = {
   broadcasting: { label: 'Broadcasting', color: 'information', icon: 'Signal-3-Bars' },
   accepted: { label: 'Accepted', color: 'success', icon: 'Check-Circle' },
-  unaccepted: { label: 'Unaccepted', color: 'neutral', icon: 'Clock' },
+  unaccepted: { label: 'Unaccepted', color: 'neutral', icon: 'Clock', outlined: true },
 };
 
 /**
@@ -341,10 +346,19 @@ function AcceptedRow({ acceptedBy }: { acceptedBy: NonNullable<BroadcastLeg['acc
   );
 }
 
-/** A 1px dashed connector segment (Figma's `[6,6]` repeating pattern). */
+/**
+ * A dashed connector segment — Figma's `518:63890` "Line" vectors are a real
+ * SVG stroke (`#E3E3E3`, dasharray `6 6`, round caps), which a CSS
+ * `repeating-linear-gradient` on a 1px-wide div only approximates: the
+ * gradient's hard color stops anti-alias against the div's own edges, so the
+ * dashes render visibly washed out rather than the token's true opacity
+ * (confirmed faint on screen — reported and reproduced). A native dashed
+ * `border-left` doesn't have that failure mode — browsers rasterize border
+ * dashes without the extra anti-aliasing pass a background gradient gets.
+ */
 const DASH_LINE: React.CSSProperties = {
-  width: 1,
-  backgroundImage: 'repeating-linear-gradient(to bottom, var(--border-neutral-default) 0 6px, transparent 6px 12px)',
+  width: 0,
+  borderLeft: 'var(--stroke-xs) dashed var(--border-neutral-default)',
 };
 
 /**
@@ -393,7 +407,7 @@ function TimelineEntry({
   return (
     <div style={{ display: 'flex', gap: 'var(--spacing-12px)', alignItems: 'flex-start', width: '100%' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 12, gap: 4 }}>
-        <div style={{ ...( !isFirst ? DASH_LINE : { width: 1 } ), flexShrink: 0, height: circleOffset - 4 }} />
+        <div style={{ ...( !isFirst ? DASH_LINE : { width: 0 } ), flexShrink: 0, height: circleOffset - 4 }} />
         <span style={{ display: 'flex', color: 'var(--icons-neutral-idle)', flexShrink: 0 }}>
           <Icon name="Circle-Large" size={12} />
         </span>
@@ -407,7 +421,7 @@ function TimelineEntry({
             text={
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
                 <span>{leg.title}</span>
-                <Badge color={outcomeBadge.color} label={outcomeBadge.label} leadingIcon={badgeIcon} />
+                <Badge color={outcomeBadge.color} label={outcomeBadge.label} leadingIcon={badgeIcon} iconOutlined={leg.outcome === 'broadcasting' ? false : outcomeBadge.outlined} />
               </span>
             }
             subtext={leg.subtext}

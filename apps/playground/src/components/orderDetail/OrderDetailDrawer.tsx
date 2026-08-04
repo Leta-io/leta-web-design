@@ -1144,7 +1144,7 @@ function DrawerBody({
               off and would only animate once, on first mount. */}
           <div key={drill ?? `tab-${tab}`} className="leta-tab-body-enter" style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
           {drill ? (
-            <DispatchLogsDrillDown drill={drill} model={broadcast} depotName={depotName} />
+            <DispatchLogsDrillDown drill={drill} model={broadcast} depotName={depotName} order={order} />
           ) : tab === 0 && showSkeleton ? (
             <DrawerSkeleton />
           ) : tab === 0 ? (

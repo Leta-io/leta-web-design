@@ -14,7 +14,8 @@ import {
 import { Icon } from '@leta/icons';
 import { DriverGroupCard } from './DriverGroupCard.js';
 import type { BroadcastModel, NotifiedDriver } from './broadcastModel.js';
-import type { DriverGroup } from '../../store/types.js';
+import type { DriverGroup, Order } from '../../store/types.js';
+import { creatorFor, scheduledOriginFor, showAutoBroadcastIcon } from '../../lib/orderMeta.js';
 
 /**
  * The three Dispatch Logs drill-downs (OM §7.5). Each **replaces the whole drawer**
@@ -80,13 +81,15 @@ function DrillToolbar({
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-12px)' }}>
           {leading && (
             <>
-              <span className="text-label-m-medium" style={{ color: 'var(--text-default-label)', whiteSpace: 'nowrap' }}>
+              {/* Figma `769:80839`: Label/M/Medium on `--text-default-label-idle`
+                  (#4f4f4f) — was the darker `--text-default-label`. */}
+              <span className="text-label-m-medium" style={{ color: 'var(--text-default-label-idle)', whiteSpace: 'nowrap' }}>
                 {leading}
               </span>
-              <div aria-hidden style={{ width: 'var(--stroke-xs)', height: 24, backgroundColor: 'var(--border-neutral-default)' }} />
+              <div aria-hidden style={{ width: 'var(--stroke-xs)', height: 32, backgroundColor: 'var(--border-neutral-default)' }} />
             </>
           )}
-          <span className="text-label-m-medium" style={{ color: 'var(--text-default-label)', whiteSpace: 'nowrap' }}>
+          <span className="text-label-m-medium" style={{ color: 'var(--text-default-label-idle)', whiteSpace: 'nowrap' }}>
             {count}
           </span>
         </div>
@@ -98,7 +101,13 @@ function DrillToolbar({
 // ── Batched Orders ──────────────────────────────────────────────────────────────
 
 /** Deterministic sibling orders in the same broadcast batch. */
-function batchRows(model: BroadcastModel, depotName: string) {
+function batchRows(model: BroadcastModel, depotName: string, order: Order) {
+  // The batch's sibling orders all share this order's provenance markers
+  // (same creation source, same auto-broadcast flag) — one lookup, applied
+  // uniformly, rather than a per-row guess.
+  const creator = creatorFor(order);
+  const broadcastIcon = showAutoBroadcastIcon(order);
+  const scheduledIcon = scheduledOriginFor(order);
   const ROUTES = [
     '3B Mango Lane, Kilimani, Nairobi',
     '7C Cedar Court, Lavington, Nairobi',
@@ -119,15 +128,13 @@ function batchRows(model: BroadcastModel, depotName: string) {
   ];
   return ROUTES.map((route, i) => ({
     cells: [
-      // The batch's sibling orders all share this order's provenance markers.
       {
-        type: 'sample' as const,
+        type: creator.source === 'human' ? ('manual-order' as const) : ('automatic-order' as const),
         orderId: `${model.batchId}-${i + 1}`,
-        showCopy: true,
-        showManualIcon: true,
-        showScheduledIcon: i % 3 === 0,
-        showBroadcastIcon: true,
-        text: `${model.batchId}-${i + 1}`,
+        onCopyOrderId: () => navigator.clipboard.writeText(`${model.batchId}-${i + 1}`),
+        showScheduledIcon: scheduledIcon,
+        scheduledTooltip: scheduledIcon ? 'Scheduled' : undefined,
+        showBroadcastIcon: broadcastIcon,
       },
       { type: 'address-cell' as const, pickup: depotName, dropoff: route },
       {
@@ -160,9 +167,9 @@ const BATCH_COLUMNS: TableColumn[] = [
   { label: 'Status', role: 'secondary', width: 140 },
 ];
 
-function BatchedOrdersScreen({ model, depotName }: { model: BroadcastModel; depotName: string }): React.ReactElement {
+function BatchedOrdersScreen({ model, depotName, order }: { model: BroadcastModel; depotName: string; order: Order }): React.ReactElement {
   const [query, setQuery] = React.useState('');
-  const rows = React.useMemo(() => batchRows(model, depotName), [model, depotName]);
+  const rows = React.useMemo(() => batchRows(model, depotName, order), [model, depotName, order]);
   const filtered = query.trim()
     ? rows.filter((r) => JSON.stringify(r.cells).toLowerCase().includes(query.trim().toLowerCase()))
     : rows;
@@ -319,12 +326,14 @@ export function DispatchLogsDrillDown({
   drill,
   model,
   depotName,
+  order,
 }: {
   drill: DrillDown;
   model: BroadcastModel;
   depotName: string;
+  order: Order;
 }): React.ReactElement {
-  if (drill === 'batched-orders') return <BatchedOrdersScreen model={model} depotName={depotName} />;
+  if (drill === 'batched-orders') return <BatchedOrdersScreen model={model} depotName={depotName} order={order} />;
   if (drill === 'priority-groups') return <PriorityGroupsScreen model={model} />;
   return <NotifiedDriversScreen model={model} />;
 }

@@ -321,17 +321,22 @@ function ActivityRow({
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', alignSelf: 'stretch', flexShrink: 0, width: 32 }}>
         <EntryLeading item={item} />
         {/* Figma `Line`: VECTOR, strokeWeight 1, dashPattern [6, 6], centered in the
-            32px column. A repeating gradient reproduces the exact 6/6 rhythm — CSS
-            `border-left: dashed` would use the browser's own dash length instead.
+            32px column. A `repeating-linear-gradient` on a 1px-wide div reproduces
+            the exact 6/6 rhythm but rendered visibly faint — reported and reproduced:
+            a hairline element positioned at a fractional CSS pixel anti-aliases
+            across two device-pixel columns, washing out the color regardless of the
+            gradient's own hard stops. A native dashed `border-left` doesn't hit that
+            failure mode (browsers rasterize border dashes without the extra
+            anti-aliasing pass a background gradient gets) at the cost of an
+            approximate, browser-chosen dash length rather than an exact 6/6.
             Omitted on the last row (Figma's creation variants have no Line child). */}
         {!isLast && (
           <div
             style={{
               flex: '1 0 0',
-              width: 1,
+              width: 0,
               minHeight: 12,
-              backgroundImage:
-                'repeating-linear-gradient(to bottom, var(--border-neutral-default) 0 6px, transparent 6px 12px)',
+              borderLeft: 'var(--stroke-xs) dashed var(--border-neutral-default)',
             }}
           />
         )}

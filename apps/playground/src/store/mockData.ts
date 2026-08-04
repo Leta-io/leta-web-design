@@ -379,10 +379,16 @@ const RAW_ORDERS: Omit<Order, 'id'>[] = [
     dropoff: { label: 'Parklands Plaza, Nairobi', lat: -1.262, lng: 36.82 },
     package: 'Supplements',
     items: 2,
-    status: 'assigned',
+    // Fallback means no one has accepted yet — pairing it with 'assigned' (a
+    // driver already has the order) was a logical contradiction, reported and
+    // fixed 2026-08-04: an order can't be both assigned to a driver and still
+    // actively broadcasting for one. Broadcasted + no driver is the only
+    // status consistent with "the fallback sweep is live."
+    status: 'broadcasted',
     // Fixture: all groups passed; the fallback sweep is live (Fallback).
     broadcastState: 'fallback',
-    driverId: 'DRV-04',
+    driverId: null,
+    batchId: 'BC-5190',
     createdAt: '2026-06-29T09:20:00',
     priority: 'standard',
   },
