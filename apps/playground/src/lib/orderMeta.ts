@@ -74,17 +74,16 @@ export function creatorLabelFor(order: Order): string {
 export function scheduledOriginFor(o: Order): boolean {
   return o.status === 'scheduled' || idHash(o.id) % 2 === 0;
 }
-export function autoBroadcastFor(o: Order): boolean {
-  return idHash(o.id) % 3 === 0;
-}
-/** Statuses eligible to show the Broadcast icon — any dispatched/finished status, never
- *  while still unassigned (Scheduled/Pending/Broadcasted/Returned). */
-const BROADCAST_ELIGIBLE: OrderStatus[] = ['assigned', 'at-depot', 'in-transit', 'arrived', 'returning', 'delivered', 'cancelled'];
-/** Auto-broadcast icon (Order-ID cell + drawer header) — only shows once a driver has
- *  been assigned, never on a still-unassigned order (§7.2). */
-export function showAutoBroadcastIcon(o: Order): boolean {
-  return autoBroadcastFor(o) && BROADCAST_ELIGIBLE.includes(o.status);
-}
+/**
+ * The Broadcast provenance icon lives in `lib/dispatchNarrative.ts` now
+ * (`DispatchNarrative.showBroadcastIcon`).
+ *
+ * It used to be `autoBroadcastFor(o) = idHash % 3 === 0` — a hash unrelated to
+ * every other dispatch signal, which is why an order could show the icon while
+ * its Dispatch Logs claimed a manual assignment, or show no icon while the
+ * Overview banner announced an automatic one. Do not reintroduce a local
+ * provenance hash: derive from the narrative so all surfaces agree.
+ */
 /** Today at the next full hour (reschedule anchor + fallbacks). */
 export function nextHourToday(): Date {
   const d = new Date();

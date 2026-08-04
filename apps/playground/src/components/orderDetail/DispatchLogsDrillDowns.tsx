@@ -15,7 +15,7 @@ import { Icon } from '@leta/icons';
 import { DriverGroupCard } from './DriverGroupCard.js';
 import type { BroadcastModel, NotifiedDriver } from './broadcastModel.js';
 import type { DriverGroup, Order } from '../../store/types.js';
-import { creatorFor, scheduledOriginFor, showAutoBroadcastIcon } from '../../lib/orderMeta.js';
+import { creatorFor, scheduledOriginFor } from '../../lib/orderMeta.js';
 
 /**
  * The three Dispatch Logs drill-downs (OM §7.5). Each **replaces the whole drawer**
@@ -102,11 +102,13 @@ function DrillToolbar({
 
 /** Deterministic sibling orders in the same broadcast batch. */
 function batchRows(model: BroadcastModel, depotName: string, order: Order) {
-  // The batch's sibling orders all share this order's provenance markers
-  // (same creation source, same auto-broadcast flag) — one lookup, applied
-  // uniformly, rather than a per-row guess.
+  // The batch's sibling orders all share this order's creation source — one
+  // lookup, applied uniformly, rather than a per-row guess.
   const creator = creatorFor(order);
-  const broadcastIcon = showAutoBroadcastIcon(order);
+  // Every row here renders the "Broadcasted" badge — i.e. still unassigned — and
+  // the Broadcast provenance icon only appears once a driver holds the order
+  // (§7.2). So it is never eligible on these rows.
+  const broadcastIcon = false;
   const scheduledIcon = scheduledOriginFor(order);
   const ROUTES = [
     '3B Mango Lane, Kilimani, Nairobi',

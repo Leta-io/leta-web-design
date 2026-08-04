@@ -45,11 +45,10 @@ import {
   nextHourToday,
   scheduledDateFor,
   scheduledLabelFor,
-  scheduledOriginFor,
-  showAutoBroadcastIcon,
   slaStateFor,
   type SlaState,
 } from '../lib/orderMeta.js';
+import { buildDispatchNarrative } from '../lib/dispatchNarrative.js';
 import { AddOrderDrawer } from '../components/AddOrderDrawer.js';
 import { CancelOrderModal } from '../components/CancelOrderModal.js';
 import { UpdateStatusModal, type UpdateStatusTarget } from '../components/UpdateStatusModal.js';
@@ -1117,7 +1116,10 @@ export function OrdersPage(): React.ReactElement {
     // (Driver, Trip, Duration) just drop out. `''` is the no-label Actions column.
     // Duration falls back to '—' for scheduled orders that surface in a mixed view.
     const creator = creatorFor(o);
-    const scheduledOrigin = scheduledOriginFor(o);
+    // The same dispatch narrative the drawer builds — provenance icons must not
+    // be re-derived per surface (see lib/dispatchNarrative.ts).
+    const narrative = buildDispatchNarrative(o, clientConfig, getDriver(o.driverId)?.name ?? null);
+    const scheduledOrigin = narrative.scheduledOrigin;
     const cellByLabel: Record<string, TableRow['cells'][number]> = {
       // Order ID cell — manual vs automatic per the order's creation source
       // (§2.2), with the wireframes' provenance icons + hover tooltips
@@ -1129,7 +1131,9 @@ export function OrdersPage(): React.ReactElement {
         onCopyOrderId: () => navigator.clipboard.writeText(o.id),
         showScheduledIcon: scheduledOrigin,
         scheduledTooltip: scheduledOrigin ? scheduledLabelFor(o) : undefined,
-        showBroadcastIcon: showAutoBroadcastIcon(o),
+        // From the shared dispatch narrative, so the table's Broadcast icon and
+        // the drawer's header icon / banner / Dispatch Logs always agree.
+        showBroadcastIcon: narrative.showBroadcastIcon,
       },
       'Batch ID': { type: 'sample', text: o.batchId ?? '—' }, // Broadcasted view only
       // Trip cell — a Plain button ("TRP-103 ↗", trailing Open icon, no

@@ -438,11 +438,20 @@ function DrawerBody({
     [order, driver, config],
   );
   const activityItems = React.useMemo(() => buildActivityTrail(model, config), [model, config]);
-  // Dispatch Logs (§7.5) — the seven broadcast shapes, derived from
-  // (fleetType, the depot's broadcast config, status, provenance).
+  // Dispatch Logs (§7.5) — the seven broadcast shapes. The state and the
+  // accepting driver both come from `model.narrative`, the drawer's single
+  // dispatch-provenance derivation, so this tab can never disagree with the
+  // Overview banner or the Activity trail.
   const broadcast = React.useMemo(
-    () => buildBroadcastModel(order, client, model.depot, driver?.name ?? null),
-    [order, client, model.depot, driver?.name],
+    () =>
+      buildBroadcastModel(
+        order,
+        client,
+        model.depot,
+        driver ? { name: driver.name, phone: driver.phone } : null,
+        model.narrative,
+      ),
+    [order, client, model.depot, driver, model.narrative],
   );
   // Dispatch Logs drill-down (Batched Orders / Priority Driver Groups /
   // Notified Drivers). Rather than swapping the drawer body in place, the
@@ -661,8 +670,14 @@ function DrawerBody({
 
   const overviewBody = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-20px)', padding: 'var(--padding-24px) var(--padding-16px) var(--padding-40px)' }}>
-      {/* Auto-broadcast assignment banner (§7.2) — dismissible, Assigned only. */}
-      {status === 'assigned' && assignBanner && driver && (
+      {/*
+        Auto-broadcast assignment banner (§7.2) — dismissible, Assigned only, and
+        ONLY when a broadcast actually assigned this driver. Previously gated on
+        `status === 'assigned'` alone, so it fired on hand-dispatched orders and
+        kept naming a driver who had since been reassigned away. Both cases are
+        now excluded by `narrative.showAutoAssignBanner`.
+      */}
+      {assignBanner && driver && model.narrative.showAutoAssignBanner && (
         <NotificationBanner
           type="highlight"
           variant="filled"

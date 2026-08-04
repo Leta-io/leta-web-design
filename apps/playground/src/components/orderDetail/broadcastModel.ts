@@ -8,6 +8,7 @@ import type {
   Order,
 } from '../../store/types.js';
 import { idHash, MONTHS } from '../../lib/orderMeta.js';
+import type { DispatchNarrative } from '../../lib/dispatchNarrative.js';
 import type { BroadcastDriver, DriverResponseStatus } from './BroadcastEventAccordion.js';
 
 /**
@@ -168,6 +169,23 @@ const DRIVER_POOL = [
   { name: 'Susan Kariuki', phone: '+254 726 789 012' },
 ];
 
+/**
+ * A deterministic phone for a driver who isn't the order's current driver (the
+ * previous holder, after a reassignment). The current driver's real phone is
+ * always used when available — see `buildBroadcastModel`'s `acceptor`.
+ */
+function phoneForName(name: string): string {
+  let s = 0;
+  for (let i = 0; i < name.length; i++) s += name.charCodeAt(i);
+  return DRIVER_POOL[s % DRIVER_POOL.length]!.phone;
+}
+
+/** Who accepted the broadcast, resolved once and shared by every leg builder. */
+interface Acceptor {
+  name: string;
+  phone: string;
+}
+
 const GROUP_SUFFIX: Record<string, string> = {
   'In-house': 'In house',
   Suppliers: 'Supplier',
@@ -227,55 +245,6 @@ function sequenceTotalSeconds(config: DepotBroadcastConfig): number {
   return Math.max(1, preOffer + perRound * Math.max(1, config.rounds) + fallback);
 }
 
-// ── Which state does this order sit in? ─────────────────────────────────────────
-
-/**
- * Maps (fleetType, depot config, order status, provenance) → one of the seven shapes.
- *
- * A seeded fixture's `order.broadcastState` wins, so every state stays reachable for
- * design review (see `mockData.ts`). Orders created live in-session carry no override
- * and fall through to derivation below.
- *
- * The derivation deliberately uses **real signals**, not a hash: whether the depot
- * broadcasts at all, whether a driver is assigned, and whether the order carries a
- * `batchId` (the marker that a broadcast actually ran for it).
- */
-function resolveState(
-  order: Order,
-  config: DepotBroadcastConfig | null,
-  autoBroadcast: boolean,
-  manualDriverName: string | null,
-): BroadcastState {
-  if (order.broadcastState) return order.broadcastState;
-
-  const dispatched = !!order.driverId;
-  // A batch id only exists once the order has been put out on a broadcast.
-  const wasBroadcast = !!order.batchId;
-
-  // No broadcast config on the depot, or the client doesn't auto-broadcast at all →
-  // any assignment must have been made by hand, before any broadcast existed.
-  if (!config || !autoBroadcast) {
-    return dispatched ? 'manual-before-broadcast' : 'on-hold';
-  }
-
-  switch (order.status) {
-    case 'scheduled':
-      return 'on-hold';
-    case 'pending':
-      // Back in the queue after a broadcast ran → the sequence was exhausted.
-      // Never broadcast → the hold window is still open.
-      return wasBroadcast ? 'exhausted' : 'on-hold';
-    case 'broadcasted':
-      return 'broadcasting';
-    case 'returned':
-      return 'on-hold';
-    default:
-      // Dispatched or finished — a driver is on it. Without a broadcast having run,
-      // the dispatcher must have assigned by hand.
-      return wasBroadcast ? 'completed' : manualDriverName ? 'manual-before-broadcast' : 'completed';
-  }
-}
-
 // ── Leg construction ────────────────────────────────────────────────────────────
 
 /**
@@ -287,7 +256,13 @@ function buildManagedLegs(
   order: Order,
   config: DepotBroadcastConfig,
   base: Date,
-  opts: { reachedRounds: number; reachedFallback: boolean; liveLeg: boolean; acceptedAt: number | null },
+  opts: {
+    reachedRounds: number;
+    reachedFallback: boolean;
+    liveLeg: boolean;
+    acceptedAt: number | null;
+    acceptor?: Acceptor | null;
+  },
 ): BroadcastLeg[] {
   const h = idHash(order.id);
   const legs: BroadcastLeg[] = [];
@@ -347,12 +322,11 @@ function buildManagedLegs(
     last.accordionType = 'active';
     last.subtext = fmtRan(elapsed, true, last.drivers.length);
     last.drivers = legDrivers(h + (legIndex - 1) * 7, last.drivers.length, true, false);
-  } else if (opts.acceptedAt != null) {
-    const acceptor = legs[opts.acceptedAt];
-    if (acceptor) {
-      const p = DRIVER_POOL[(h + 5) % DRIVER_POOL.length]!;
-      acceptor.outcome = 'accepted';
-      acceptor.acceptedBy = { name: p.name, phone: p.phone, seconds: 5 };
+  } else if (opts.acceptedAt != null && opts.acceptor) {
+    const leg = legs[opts.acceptedAt];
+    if (leg) {
+      leg.outcome = 'accepted';
+      leg.acceptedBy = { ...opts.acceptor, seconds: 5 };
     }
   }
   // The newest leg opens expanded; everything older collapses (per every wireframe).
@@ -362,7 +336,13 @@ function buildManagedLegs(
 }
 
 /** Marketplace: one flat leg listing every responder — no rounds, no groups. */
-function buildMarketplaceLeg(order: Order, base: Date, live: boolean, accepted: boolean): BroadcastLeg[] {
+function buildMarketplaceLeg(
+  order: Order,
+  base: Date,
+  live: boolean,
+  accepted: boolean,
+  acceptor: Acceptor | null,
+): BroadcastLeg[] {
   const h = idHash(order.id);
   const drivers = legDrivers(h, 5, live, accepted);
   const leg: BroadcastLeg = {
@@ -377,9 +357,8 @@ function buildMarketplaceLeg(order: Order, base: Date, live: boolean, accepted: 
     accordionType: live ? 'active' : 'completed',
     defaultOpen: true,
   };
-  if (accepted) {
-    const p = DRIVER_POOL[(h + 5) % DRIVER_POOL.length]!;
-    leg.acceptedBy = { name: p.name, phone: p.phone, seconds: 5 };
+  if (accepted && acceptor) {
+    leg.acceptedBy = { ...acceptor, seconds: 5 };
   }
   return [leg];
 }
@@ -419,27 +398,48 @@ function buildNotifiedDrivers(legs: BroadcastLeg[], fleetType: FleetType, groups
 
 // ── Entry point ─────────────────────────────────────────────────────────────────
 
+/**
+ * @param narrative the shared dispatch narrative — the ONE derivation of whether
+ *   this order was broadcast or hand-dispatched, and of which driver accepted.
+ *   Never re-derive either here; that split is what let this tab claim a manual
+ *   assignment while the Activity tab logged an automatic one.
+ */
 export function buildBroadcastModel(
   order: Order,
   client: Client,
   depot: DepotOption | undefined,
-  manualDriverName: string | null,
+  currentDriver: { name: string; phone: string } | null,
+  narrative: DispatchNarrative,
 ): BroadcastModel {
   const h = idHash(order.id);
   const fleetType = client.fleetType;
   const config = depot?.broadcast ?? null;
   const marketplace = fleetType === 'marketplace';
-  const state = resolveState(order, config, client.config.autoBroadcast, manualDriverName);
+  const state = narrative.broadcastState;
   const base = new Date(order.createdAt);
   const batchId = order.batchId ?? String(9000 + (h % 999));
   const batchedOrders = 10;
+  const manualDriverName = currentDriver?.name ?? null;
+
+  // Who accepted the broadcast — the order's REAL driver, or (after a manual
+  // reassignment) the driver who held it at the time. Never an unrelated pool
+  // name: that is what made the logs contradict the driver card.
+  const acceptor: Acceptor | null = narrative.acceptedByName
+    ? {
+        name: narrative.acceptedByName,
+        phone:
+          narrative.acceptedByName === currentDriver?.name
+            ? currentDriver.phone
+            : phoneForName(narrative.acceptedByName),
+      }
+    : null;
 
   // ── Legs ──
   let legs: BroadcastLeg[] = [];
   if (config && state !== 'on-hold' && state !== 'manual-before-broadcast') {
     const totalRounds = config.rounds;
     if (marketplace) {
-      legs = buildMarketplaceLeg(order, base, state === 'broadcasting' || state === 'fallback', state === 'completed');
+      legs = buildMarketplaceLeg(order, base, state === 'broadcasting' || state === 'fallback', state === 'completed', acceptor);
     } else if (state === 'broadcasting') {
       // Mid-sequence: a deterministic subset of the rounds has run.
       legs = buildManagedLegs(order, config, base, {
@@ -459,10 +459,9 @@ export function buildBroadcastModel(
       const reachedRounds = Math.max(1, (h % totalRounds) + 1);
       const built = buildManagedLegs(order, config, base, { reachedRounds, reachedFallback: false, liveLeg: false, acceptedAt: null });
       // `built` is newest-first; the acceptor is the newest leg.
-      if (built[0]) {
-        const p = DRIVER_POOL[(h + 5) % DRIVER_POOL.length]!;
+      if (built[0] && acceptor) {
         built[0].outcome = 'accepted';
-        built[0].acceptedBy = { name: p.name, phone: p.phone, seconds: 5 };
+        built[0].acceptedBy = { ...acceptor, seconds: 5 };
         built[0].drivers = built[0].drivers.slice(1);
       }
       legs = built;

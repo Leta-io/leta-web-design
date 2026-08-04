@@ -71,6 +71,21 @@ export interface Order {
   cancelReasons?: string[];
   /** Optional free-text cancellation note (required when "Other" is a reason). */
   cancelNote?: string;
+  /**
+   * How many times a dispatcher has re-broadcast this order after an exhausted
+   * sequence. Each one restarts the sequence (Pending → Broadcasted) and adds an
+   * "{dispatcher} rebroadcasted the order" entry to the Activity trail
+   * (Figma `1487:173235` → "Order Rebroadcasted"). In-session only — seeded
+   * fixtures reset on reload so demos stay repeatable.
+   */
+  rebroadcastCount?: number;
+  /**
+   * Epoch ms the order's current broadcast sequence began. Drives the LIVE
+   * escalation clock: which priority group is broadcasting now, the per-attempt
+   * progress bar, and when the sequence exhausts. Unset for orders that aren't
+   * out on a broadcast.
+   */
+  broadcastStartedAt?: number;
 }
 
 export interface Driver {

@@ -1,6 +1,7 @@
 import type { IconName } from '@leta/icons';
 import type { ClientConfig, DepotOption, Driver, Order, OrderStatus } from '../../store/types.js';
 import { DISPATCHER_NAME } from './activityModel.js';
+import { buildDispatchNarrative, type DispatchNarrative } from '../../lib/dispatchNarrative.js';
 import {
   creatorFor,
   depotForOrder,
@@ -12,8 +13,6 @@ import {
   MONTHS,
   scheduledDateFor,
   scheduledLabelFor,
-  scheduledOriginFor,
-  showAutoBroadcastIcon,
   slaStateFor,
   type Creator,
   type SlaState,
@@ -89,9 +88,16 @@ export interface OrderDetailModel {
   creator: Creator;
   /** Provenance icon + tooltip (mirrors the table's Order-ID cell icons). */
   provenanceIcon: { icon: IconName; outlined: boolean; tooltip: string };
+  /**
+   * **The dispatch source of truth** — how this order got its driver. Every tab
+   * reads this rather than deriving provenance itself, so the Overview banner,
+   * the Activity trail and the Dispatch Logs tab can never contradict each other
+   * (see `lib/dispatchNarrative.ts` for the failure this replaced).
+   */
+  narrative: DispatchNarrative;
   scheduledOrigin: boolean;
   /** Auto-broadcast order → Broadcast icon in the header (mirrors the table's
-   *  Order-ID cell, §3.2/§7.2). */
+   *  Order-ID cell, §3.2/§7.2). Sourced from {@link narrative}. */
   showBroadcast: boolean;
   scheduledDate: Date;
   /** "Scheduled: 09 Jun 2027, 12:30 PM" (Calendar icon tooltip). */
@@ -197,7 +203,8 @@ export function buildOrderDetail(
   const rawSla = slaStateFor(order);
   const sla: SlaState = isFinished && rawSla === 'at-risk' ? 'on-target' : rawSla;
   const scheduled = scheduledDateFor(order);
-  const schedOrigin = scheduledOriginFor(order);
+  // One derivation of dispatch provenance for the whole drawer.
+  const narrative = buildDispatchNarrative(order, config, driver?.name ?? null);
 
   // Elapsed counter base (§7.2 counter window): Scheduled + Returned start at 0.
   const elapsedBase =
@@ -309,12 +316,14 @@ export function buildOrderDetail(
           outlined: false,
           tooltip: creator.source === 'storefront' ? 'Auto-create via online store' : 'Auto-create via connected app',
         },
-    // A Pending order is scheduled-origin (Calendar icon) only when it dropped
-    // Scheduled→Pending on a NON-auto-broadcast client (Pending Ov2). On an
-    // auto-broadcast client a scheduled order skips Pending entirely (§7.2), so
-    // its Pending state (order-wait-time, Ov1) is never scheduled-origin.
-    scheduledOrigin: schedOrigin && !(status === 'pending' && config.autoBroadcast),
-    showBroadcast: showAutoBroadcastIcon(order),
+    narrative,
+    // Both sourced from the narrative — a Pending order is scheduled-origin
+    // (Calendar icon) only when it dropped Scheduled→Pending on a
+    // NON-auto-broadcast client (Pending Ov2); on an auto-broadcast client a
+    // scheduled order skips Pending entirely (§7.2). The Broadcast icon now
+    // means "was dispatched by broadcast", so it agrees with the banner + logs.
+    scheduledOrigin: narrative.scheduledOrigin,
+    showBroadcast: narrative.showBroadcastIcon,
     scheduledDate: scheduled,
     scheduledTooltip: scheduledLabelFor(order),
     sla,
