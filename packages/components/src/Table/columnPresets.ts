@@ -9,10 +9,11 @@ import type { TableColumn } from './Table.js';
  *
  * Sizing model:
  * - Fixed columns use `width`.
- * - Primary flexible columns share the remaining width by `flex` weight, expressed
- *   with **Recipient = 1.00** (§3.2): Route 1.48 (40%), Driver 1.22 (33%),
- *   Recipient 1.00 (27%). Each carries a `minWidth` floor (§3.4). When Driver is
- *   removed (Unassigned/All), Route/Recipient settle at 60/40 on their own.
+ * - Primary flexible columns share the remaining width by `flex` weight (§3.2):
+ *   Route 1.48, Driver 1.22, Recipient **0.63** (lowered from the original 1.00
+ *   base on 2026-08-04 — see {@link RECIPIENT}; it was absorbing surplus it could
+ *   not use while Route truncated). Each carries a `minWidth` floor (§3.4). When
+ *   Driver is removed (Unassigned/All), Route/Recipient settle at **70/30**.
  * - Order ID is **low-weight flexible** (§3.3): a low `flex` weight with a 150px
  *   floor and no hard cap — the low weight (0.5 vs Route's 1.48) is the governor.
  *   It sits near 150 when constrained; on wide viewports it grows slowly (Route
@@ -60,7 +61,23 @@ const TRIP: TableColumn = { label: 'Trip', role: 'identifier', width: 90 };
 const BATCH_ID: TableColumn = { label: 'Batch ID', role: 'identifier', width: 90 };
 const DRIVER: TableColumn = { label: 'Driver', role: 'primary', flex: 1.22, minWidth: DRIVER_FLOOR };
 const ROUTE: TableColumn = { label: 'Route', role: 'primary', flex: 1.48, minWidth: ROUTE_FLOOR };
-const RECIPIENT: TableColumn = { label: 'Recipient', role: 'primary', flex: 1.0, minWidth: RECIPIENT_FLOOR };
+/**
+ * Recipient's weight was lowered 1.00 → 0.63 (2026-08-04) because it was hoarding
+ * surplus it cannot use. Measured on a wide viewport: Recipient rendered 208px
+ * while its content ("Amina Yusuf" + a full phone) ended at 130px — 80px of dead
+ * space — *in the same row where Route was truncating* ("38 Cedar Lane, Kilimani,
+ * Nair…"). The surplus was sitting in the column that didn't need it, next to the
+ * one that did.
+ *
+ * 0.63 puts the no-Driver views (Unassigned / All) at Route 70 / Recipient 30
+ * (was 60/40). Recipient still never truncates its phone — {@link RECIPIENT_FLOOR}
+ * is the flex-basis, so the floor is satisfied before any surplus is shared (§4.1).
+ *
+ * Flex weights are scale-invariant, so this is mathematically identical to raising
+ * Route and Driver proportionally; lowering Recipient just keeps Route's and
+ * Driver's familiar Figma-derived numbers readable in the preset.
+ */
+const RECIPIENT: TableColumn = { label: 'Recipient', role: 'primary', flex: 0.63, minWidth: RECIPIENT_FLOOR };
 /** The Duration header carries an ⓘ across every order table (per the wireframes'
  *  `Duration ⓘ` header) — the column shows the order's fulfilment time (Doc 4);
  *  the ⓘ's hover tooltip names it. */
@@ -68,6 +85,8 @@ const DURATION: TableColumn = {
   label: 'Duration',
   role: 'utility',
   width: 110,
+  // Numeric — right-aligned so durations read down a common right edge.
+  align: 'right',
   showTrailingIcon: true,
   trailingIcon: 'Info',
   trailingIconTooltip: 'Total fulfilment time',
@@ -91,7 +110,7 @@ const DURATION_FINISHED: TableColumn = DURATION;
  * with room to spare. Trimming the flexible floors to avoid this was rejected: the
  * Recipient floor exists so the phone never truncates (§6).
  */
-const DISTANCE: TableColumn = { label: 'Distance', role: 'utility', width: 90 };
+const DISTANCE: TableColumn = { label: 'Distance', role: 'utility', width: 90, align: 'right' };
 const CREATED: TableColumn = { label: 'Created', role: 'utility', width: 120 };
 const STATUS: TableColumn = { label: 'Status', role: 'utility', width: 140 };
 /** Order table: single overflow button — 64px (§ Instance A). */

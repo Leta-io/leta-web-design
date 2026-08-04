@@ -82,6 +82,13 @@ export interface CellProps
   text?: string;
   /** `sample`: right-align the value (numeric quantities/amounts). Default false. */
   alignRight?: boolean;
+  /**
+   * Horizontal alignment of the cell's whole content, any `type`. `'right'` for
+   * numeric columns (Distance, Duration) per the annotations' "right-align
+   * numerics" rule. Normally set once on the `TableColumn` so the header label and
+   * its values align together, rather than per cell.
+   */
+  align?: 'left' | 'right';
   /** `date`: the two-line date/time value. Default "Jan 23, 2023\n9:00 AM". */
   date?: string;
   /** `text-link`: the link text. Default "contact@gmail.com". */
@@ -271,6 +278,7 @@ export const Cell = React.forwardRef<HTMLDivElement, CellProps>(function Cell(
     onCheckedChange,
     text = 'Content',
     alignRight = false,
+    align,
     date = 'Jan 23, 2023\n9:00 AM',
     link = 'contact@gmail.com',
     onLinkClick,
@@ -371,7 +379,7 @@ export const Cell = React.forwardRef<HTMLDivElement, CellProps>(function Cell(
       inner = (
         <span
           className="text-label-m-regular"
-          style={{ color: 'var(--text-default-label)', width: '100%', textAlign: alignRight ? 'right' : 'left' }}
+          style={{ color: 'var(--text-default-label)', width: '100%', textAlign: alignRight || align === 'right' ? 'right' : 'left' }}
         >
           {text}
         </span>
@@ -579,6 +587,14 @@ export const Cell = React.forwardRef<HTMLDivElement, CellProps>(function Cell(
     // vertically via align-items; justify-content stays their horizontal axis.
     justifyContent: isCol || CENTER_ROW.has(type) ? 'center' : 'flex-start',
     gap: GAP[type] ?? (isCol ? 0 : 'var(--spacing-8px)'),
+    // Numeric columns right-align ("right-align numerics", Cell annotations). A
+    // column cell stacks vertically, so its horizontal axis is `align-items`;
+    // a row cell's is `justify-content`.
+    ...(align === 'right'
+      ? isCol
+        ? { alignItems: 'flex-end' as const }
+        : { justifyContent: 'flex-end' as const }
+      : null),
     paddingTop: 'var(--padding-10px)',
     paddingBottom: 'var(--padding-10px)',
     paddingLeft: 'var(--padding-12px)',

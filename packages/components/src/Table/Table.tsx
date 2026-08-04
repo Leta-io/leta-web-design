@@ -35,6 +35,16 @@ export interface TableColumn {
    * equal width" the default. Explicit `width`/`flex` always win over the role.
    */
   role?: TableColumnRole;
+  /**
+   * Horizontal alignment of this column's header label AND every body value in it.
+   * `'right'` for numeric columns (Distance, Duration) per the Cell annotations'
+   * "right-align numerics" rule — figures read down a right edge, so magnitudes
+   * are comparable at a glance. Defaults to left.
+   *
+   * Deliberately a **column** property: aligning only the cells would leave the
+   * header label sitting over the opposite edge of its own numbers.
+   */
+  align?: 'left' | 'right';
   /** Fixed column width (px or CSS). Omit → the column flexes to fill an equal share. */
   width?: number | string;
   /**
@@ -631,6 +641,7 @@ export const Table = React.forwardRef<HTMLDivElement, TableProps>(function Table
             showTrailingIcon={c.showTrailingIcon}
             trailingIcon={c.trailingIcon}
             trailingIconTooltip={c.trailingIconTooltip}
+            align={c.align}
             style={{ height: '100%' }}
           />
         </Col>
@@ -654,6 +665,10 @@ export const Table = React.forwardRef<HTMLDivElement, TableProps>(function Table
         // Pin the anchor columns identically to the header (§4.3), scrollX only.
         pinned: pins[j]?.side,
         pinInset: pins[j]?.inset,
+        // Alignment is a COLUMN property, so the header label and every body value
+        // right-align together. Setting it per-cell would drift the numbers away
+        // from their own header.
+        align: c.align ?? columns[j]?.align,
       });
       const cells: DataRowCell[] = selectable
         ? [
