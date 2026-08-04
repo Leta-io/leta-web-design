@@ -321,6 +321,7 @@ export function OrdersPage(): React.ReactElement {
   const assignOrder = useStore((s) => s.assignOrder);
   const cancelOrder = useStore((s) => s.cancelOrder);
   const rebroadcastOrder = useStore((s) => s.rebroadcastOrder);
+  const exhaustBroadcast = useStore((s) => s.exhaustBroadcast);
   const pushToast = useStore((s) => s.pushToast);
   const addOrder = useStore((s) => s.addOrder);
   // Active client config — drives the Add Order drawer's fields/sections.
@@ -883,6 +884,19 @@ export function OrdersPage(): React.ReactElement {
     });
     clearSelection();
   };
+  /**
+   * The live broadcast sequence ran to its end with nobody accepting. The order
+   * drops back to Pending, where Dispatch Logs shows its Exhausted shape and the
+   * Re-broadcast action. No toast — the dispatcher is already looking at the tab
+   * that explains it, and a sequence timing out is not an action they took.
+   */
+  const handleBroadcastExhausted = React.useCallback(
+    (orderId: string) => {
+      exhaustBroadcast(orderId);
+    },
+    [exhaustBroadcast],
+  );
+
   /**
    * Dispatcher re-broadcast from the Dispatch Logs tab's Exhausted card. Puts the
    * order back out on a live sequence (Pending → Broadcasted), which also adds
@@ -1513,6 +1527,7 @@ export function OrdersPage(): React.ReactElement {
           addToTrip,
           changeDriver,
           rebroadcast: rebroadcast,
+          broadcastExhausted: handleBroadcastExhausted,
           stub: (title) => noop(title),
         }}
       />

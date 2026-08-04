@@ -677,6 +677,15 @@ const ALL_RAW_ORDERS: Omit<Order, 'id'>[] = [...RAW_ORDERS, ...GENERATED_ORDERS]
  * `driverId: null`) carry no trip; their Trip cell renders "--" per the
  * Cancelled-table wireframe (`1213:98975`).
  */
+/**
+ * Seeded orders deliberately carry **no** `broadcastStartedAt`. A live sequence's
+ * origin depends on the *depot's* configured ladder (a 65s two-group depot vs a
+ * 320s full-ladder one), and which depot an order resolves to depends on the
+ * active client — neither is known here. Stamping a fixed offset at this layer
+ * back-dated short-ladder orders past their own end, so they exhausted the
+ * instant you opened them. The drawer derives the origin from the resolved
+ * config instead (`seededOffsetSeconds`), which also keeps it reset-on-reload.
+ */
 export const MOCK_ORDERS: Order[] = ALL_RAW_ORDERS.map((o, i) => ({
   id: makeOrderId(i),
   ...(o.driverId ? { tripId: `TRP-${101 + (i % 8)}` } : null),

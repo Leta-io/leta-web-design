@@ -72,7 +72,9 @@ export function DriverGroupCard({
   fallbackEnabled = true,
   broadcasting = false,
   driversFound = 3,
-  initialElapsedSeconds = 10,
+  elapsedSeconds = 0,
+  attemptPct = 0,
+  attempt = 1,
 }: {
   /** The group this card describes (from the depot's configured ladder). */
   group: DriverGroup;
@@ -84,7 +86,21 @@ export function DriverGroupCard({
   broadcasting?: boolean;
   /** "M drivers found" — only shown while broadcasting. */
   driversFound?: number;
-  initialElapsedSeconds?: number;
+  /**
+   * Seconds this group's leg has been running, from the shared broadcast clock
+   * (`liveBroadcast.resolveLive`). The card no longer keeps its own interval:
+   * doing so let it drift from the timeline and, once past
+   * `acceptanceWindow × retries`, pin the bar at 100% forever — the stuck bar on
+   * Floaters [P3]. Escalation is the caller's decision now, driven by the clock.
+   */
+  elapsedSeconds?: number;
+  /**
+   * 0–100 fill of the CURRENT retry attempt. Restarts at zero on each retry
+   * rather than continuing or holding full.
+   */
+  attemptPct?: number;
+  /** 1-based retry currently running, for the "try N of M" meta. */
+  attempt?: number;
 }): React.ReactElement {
   ensureStyles();
   const meta = {
@@ -98,28 +114,15 @@ export function DriverGroupCard({
     escalation: escalationCopy(group, ladder ?? [group], fallbackEnabled),
   };
 
-  const [elapsed, setElapsed] = React.useState(initialElapsedSeconds);
-  React.useEffect(() => {
-    if (!broadcasting) return;
-    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(t);
-  }, [broadcasting]);
-
   // "Searching for signal" illusion — cycles 1→2→3 bars while broadcasting. Shared
   // with the timeline's live "Broadcasting" badge so both read as one animation.
   const signalIcon = useBroadcastSignalIcon(broadcasting);
 
-  // Realistic broadcast timing: the bar fills over ONE acceptance window, then
-  // restarts — one sawtooth per retry. After `retries` full cycles the group's
-  // window is exhausted (it would escalate per the banner below), so the bar
-  // holds at 100%. `retries` cycles × window seconds = the escalation time the
-  // banner quotes.
-  const cycles = Math.max(1, meta.retries);
-  const totalWindow = meta.acceptanceWindowSeconds * cycles;
-  const progressPct =
-    elapsed >= totalWindow
-      ? 100
-      : ((elapsed % meta.acceptanceWindowSeconds) / meta.acceptanceWindowSeconds) * 100;
+  const elapsed = Math.round(elapsedSeconds);
+  const progressPct = attemptPct;
+  // The bar restarts each retry, so suppress the width transition on the
+  // wrap-around — otherwise it visibly slides backwards from 100% to 0%.
+  const wrapping = progressPct < 4;
 
   return (
     <div
@@ -134,8 +137,10 @@ export function DriverGroupCard({
         overflow: 'hidden',
       }}
     >
-      {/* Accent bar — a rounded loading bar pinned to the top edge, filling in
-          step with `elapsed` (one sawtooth per retry). Rounded ends per design. */}
+      {/* Accent bar — a rounded loading bar pinned to the top edge. Fills over ONE
+          acceptance window then restarts for the next retry (never sticks full);
+          when the group's last retry ends the caller moves `broadcasting` to the
+          next group and this card goes back to its queued state. */}
       {broadcasting && (
         <div
           style={{
@@ -146,7 +151,7 @@ export function DriverGroupCard({
             width: `${progressPct}%`,
             backgroundColor: 'var(--icons-information-default)',
             borderRadius: 'var(--rounding-round)',
-            transition: 'width 1s linear',
+            transition: wrapping || prefersReducedMotion() ? 'none' : 'width 500ms linear',
           }}
         />
       )}
@@ -195,6 +200,7 @@ export function DriverGroupCard({
                 style={{ color: 'var(--text-default-sub-body)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}
               >
                 {elapsed}s elapsed · {driversFound} drivers found
+                {meta.retries > 1 ? ` · try ${attempt} of ${meta.retries}` : ''}
               </span>
             </div>
           )}

@@ -57,6 +57,8 @@ interface StoreState {
    * back to Broadcasted and a fresh sequence starts running live.
    */
   rebroadcastOrder: (id: string) => void;
+  /** The live sequence ended unaccepted → order returns to Pending (OM §7.5). */
+  exhaustBroadcast: (id: string) => void;
 
   // --- toasts ---
   pushToast: (toast: Omit<ToastItem, 'id'>) => void;
@@ -136,6 +138,20 @@ export const useStore = create<StoreState>((set, get) => ({
       ),
       drivers: s.drivers.map((d) =>
         d.id === driverId ? { ...d, status: 'busy', currentOrderId: orderId } : d,
+      ),
+    }));
+  },
+
+  exhaustBroadcast: (id) => {
+    // The sequence ran to its end unaccepted → back into the queue as Pending.
+    // The batch id stays (a broadcast really did run, which is what makes the
+    // Dispatch Logs tab resolve to `exhausted`), and the live clock is cleared so
+    // nothing keeps ticking.
+    set((s) => ({
+      orders: s.orders.map((o) =>
+        o.id === id && o.status === 'broadcasted'
+          ? { ...o, status: 'pending', broadcastStartedAt: undefined, broadcastState: undefined }
+          : o,
       ),
     }));
   },

@@ -35,6 +35,8 @@ import { buildOrderDetail, type OrderDetailModel, type ProofFile } from './detai
 import { ExpandedMapOverlay } from './OrderDetailMap.js';
 import { OrderOverviewCard } from './OrderOverviewCard.js';
 import { buildBroadcastModel } from './broadcastModel.js';
+import { seededOffsetSeconds } from './liveBroadcast.js';
+import { idHash } from '../../lib/orderMeta.js';
 import { DispatchLogsTab } from './DispatchLogsTab.js';
 import { DispatchLogsDrillDown, DRILL_TITLE, type DrillDown } from './DispatchLogsDrillDowns.js';
 
@@ -305,6 +307,12 @@ export interface OrderDetailActions {
    * owns this action (the wireframe's ⋯ menu has no Re-broadcast item).
    */
   rebroadcast: (id: string) => void;
+  /**
+   * The live broadcast sequence ran to its end with nobody accepting — the host
+   * drops the order back to Pending, which flips Dispatch Logs to its Exhausted
+   * shape (OM §7.5). Fired once per order.
+   */
+  broadcastExhausted: (id: string) => void;
   /** Unbuilt actions (Return Order / Add Comment / Recipient Map). */
   stub: (title: string) => void;
 }
@@ -444,6 +452,41 @@ function DrawerBody({
     [order, driver, config],
   );
   const activityItems = React.useMemo(() => buildActivityTrail(model, config), [model, config]);
+  // ── The live broadcast clock ──
+  // A sequence genuinely runs while the drawer is open: `broadcastStartedAt` is the
+  // origin and this ticks the derived seconds, so the active priority group
+  // escalates, the per-attempt bars restart per retry, and the timeline grows —
+  // all from one clock (see liveBroadcast.ts).
+  // A real re-broadcast stores its own origin; a seeded order gets one derived
+  // from ITS depot's ladder, back-dated into the first ~70% so it opens
+  // mid-sequence with runway left. Derived (not stored) so it resets on reload —
+  // which is what keeps demos repeatable while the sequence really does advance.
+  // Deriving per-config matters: a fixed offset overshot short ladders (a 65s
+  // two-group depot) and those orders exhausted the moment the drawer opened.
+  const depotBroadcastConfig = model.depot?.broadcast ?? null;
+  const seededStartedAt = React.useMemo(
+    () =>
+      depotBroadcastConfig
+        ? Date.now() - seededOffsetSeconds(depotBroadcastConfig, idHash(order.id)) * 1000
+        : null,
+    [depotBroadcastConfig, order.id],
+  );
+  const broadcastStartedAt =
+    order.status === 'broadcasted' ? (order.broadcastStartedAt ?? seededStartedAt) : null;
+  const isLiveBroadcast = broadcastStartedAt != null;
+  const [broadcastSeconds, setBroadcastSeconds] = React.useState(() =>
+    broadcastStartedAt != null ? Math.max(0, (Date.now() - broadcastStartedAt) / 1000) : 0,
+  );
+  React.useEffect(() => {
+    if (!isLiveBroadcast || broadcastStartedAt == null) return;
+    const tick = () => setBroadcastSeconds(Math.max(0, (Date.now() - broadcastStartedAt) / 1000));
+    tick();
+    // 500ms keeps the bars smooth without a per-frame cost; every consumer reads
+    // the same value so nothing can drift.
+    const t = setInterval(tick, 500);
+    return () => clearInterval(t);
+  }, [isLiveBroadcast, broadcastStartedAt]);
+
   // Dispatch Logs (§7.5) — the seven broadcast shapes. The state and the
   // accepting driver both come from `model.narrative`, the drawer's single
   // dispatch-provenance derivation, so this tab can never disagree with the
@@ -456,9 +499,21 @@ function DrawerBody({
         model.depot,
         driver ? { name: driver.name, phone: driver.phone } : null,
         model.narrative,
+        isLiveBroadcast ? broadcastSeconds : undefined,
       ),
-    [order, client, model.depot, driver, model.narrative],
+    [order, client, model.depot, driver, model.narrative, isLiveBroadcast, broadcastSeconds],
   );
+
+  // The sequence ran to the end with nobody accepting → the order drops back to
+  // Pending and the tab flips to its Exhausted shape (with Re-broadcast). Done in
+  // an effect, once, because it is a state transition rather than a render value.
+  const exhaustedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!isLiveBroadcast || !broadcast.live?.exhausted) return;
+    if (exhaustedRef.current === order.id) return;
+    exhaustedRef.current = order.id;
+    actions.broadcastExhausted(order.id);
+  }, [isLiveBroadcast, broadcast.live?.exhausted, order.id, actions]);
   // Dispatch Logs drill-down (Batched Orders / Priority Driver Groups /
   // Notified Drivers). Rather than swapping the drawer body in place, the
   // drill-down is a SECOND panel that **slides in over the parent drawer** —

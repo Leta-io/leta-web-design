@@ -9,6 +9,7 @@ import type {
 } from '../../store/types.js';
 import { idHash, MONTHS } from '../../lib/orderMeta.js';
 import type { DispatchNarrative } from '../../lib/dispatchNarrative.js';
+import { PRE_OFFER_SECONDS, resolveLive, sequenceTotalSeconds, type LiveSequence } from './liveBroadcast.js';
 import type { BroadcastDriver, DriverResponseStatus } from './BroadcastEventAccordion.js';
 
 /**
@@ -144,6 +145,13 @@ export interface BroadcastModel {
   notifiedDrivers: NotifiedDriver[];
   /** Batch identifier shown in the Batched Orders drill-down. */
   batchId: string;
+  /**
+   * The live sequence position when a real clock is driving this order (null for
+   * static shapes). The Priority Driver Groups drill-down reads it to decide
+   * which group card is `broadcasting` and how full its per-attempt bar is, so
+   * the drill-down and the status card can never name different groups.
+   */
+  live: LiveSequence | null;
 }
 
 // ── Mock driver pool ────────────────────────────────────────────────────────────
@@ -228,22 +236,11 @@ function fmtStamp(base: Date, minuteOffset: number): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${h}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
 }
 
-/** Round-1 pre-offer lead + fallback-sweep windows (must match the leg builder). */
-const PRE_OFFER_SECONDS = 20;
-const FALLBACK_SECONDS = 40;
+// The sequence timeline (leg layout, totals, live position) lives in
+// `liveBroadcast.ts` so the status card, this timeline and the Priority Driver
+// Groups drill-down all read ONE clock and cannot disagree about which group is
+// broadcasting.
 
-/**
- * Total wall-clock seconds one broadcast sequence runs: the round-1 pre-offer
- * lead (if enabled), then every group's `acceptanceWindow × retries` across all
- * `rounds`, then the fallback sweep (if enabled). Drives the status-card bar's
- * live fill (`elapsed / total`).
- */
-function sequenceTotalSeconds(config: DepotBroadcastConfig): number {
-  const perRound = config.groups.reduce((s, g) => s + g.acceptanceWindowSeconds * Math.max(1, g.retries), 0);
-  const preOffer = config.preOfferEnabled ? PRE_OFFER_SECONDS : 0;
-  const fallback = config.fallbackEnabled ? FALLBACK_SECONDS : 0;
-  return Math.max(1, preOffer + perRound * Math.max(1, config.rounds) + fallback);
-}
 
 // ── Leg construction ────────────────────────────────────────────────────────────
 
@@ -262,6 +259,8 @@ function buildManagedLegs(
     liveLeg: boolean;
     acceptedAt: number | null;
     acceptor?: Acceptor | null;
+    /** Real seconds the live leg has been running (from the shared clock). */
+    liveLegElapsed?: number;
   },
 ): BroadcastLeg[] {
   const h = idHash(order.id);
@@ -317,7 +316,11 @@ function buildManagedLegs(
     const windowSeconds = last.kind === 'group'
       ? config.groups.find((g) => last.title.startsWith(g.name))?.acceptanceWindowSeconds ?? 40
       : 40;
-    const elapsed = Math.max(5, (h % windowSeconds) || 10);
+    // The live leg counts up from the shared clock when there is one; the hashed
+    // value is only a fallback for a static render.
+    const elapsed = opts.liveLegElapsed != null
+      ? Math.max(0, Math.round(opts.liveLegElapsed))
+      : Math.max(5, (h % windowSeconds) || 10);
     last.outcome = 'broadcasting';
     last.accordionType = 'active';
     last.subtext = fmtRan(elapsed, true, last.drivers.length);
@@ -410,6 +413,13 @@ export function buildBroadcastModel(
   depot: DepotOption | undefined,
   currentDriver: { name: string; phone: string } | null,
   narrative: DispatchNarrative,
+  /**
+   * Seconds since this order's sequence started, when it is live. Supplying it
+   * switches the whole tab onto the real clock: which priority group is
+   * broadcasting, how much timeline history exists, and the bars. Omit for a
+   * static render.
+   */
+  liveSeconds?: number,
 ): BroadcastModel {
   const h = idHash(order.id);
   const fleetType = client.fleetType;
@@ -434,26 +444,30 @@ export function buildBroadcastModel(
       }
     : null;
 
+  // ── The live clock ──
+  // One resolution of the sequence position, reused for the timeline history, the
+  // status-card copy/bar and the Priority Driver Groups drill-down.
+  const live: LiveSequence | null =
+    config && liveSeconds != null && (state === 'broadcasting' || state === 'fallback')
+      ? resolveLive(config, liveSeconds)
+      : null;
+
   // ── Legs ──
   let legs: BroadcastLeg[] = [];
   if (config && state !== 'on-hold' && state !== 'manual-before-broadcast') {
     const totalRounds = config.rounds;
     if (marketplace) {
       legs = buildMarketplaceLeg(order, base, state === 'broadcasting' || state === 'fallback', state === 'completed', acceptor);
-    } else if (state === 'broadcasting') {
-      // Mid-sequence: a deterministic subset of the rounds has run.
+    } else if (state === 'broadcasting' || state === 'fallback') {
+      // How far the sequence has actually run. With a live clock this advances in
+      // real time (P1 → P2 → … → fallback); without one it falls back to the
+      // static shape so a non-live render still looks sane.
       legs = buildManagedLegs(order, config, base, {
-        reachedRounds: Math.max(1, (h % totalRounds) + 1),
-        reachedFallback: false,
+        reachedRounds: live ? live.reachedRounds : state === 'fallback' ? totalRounds : Math.max(1, (h % totalRounds) + 1),
+        reachedFallback: live ? live.reachedFallback : state === 'fallback',
         liveLeg: true,
         acceptedAt: null,
-      });
-    } else if (state === 'fallback') {
-      legs = buildManagedLegs(order, config, base, {
-        reachedRounds: totalRounds,
-        reachedFallback: true,
-        liveLeg: true,
-        acceptedAt: null,
+        liveLegElapsed: live?.legElapsedSeconds,
       });
     } else if (state === 'completed') {
       const reachedRounds = Math.max(1, (h % totalRounds) + 1);
@@ -480,8 +494,11 @@ export function buildBroadcastModel(
   const liveLeg = legs.find((l) => l.outcome === 'broadcasting') ?? null;
   const acceptedLeg = legs.find((l) => l.outcome === 'accepted') ?? null;
 
-  // Elapsed across the whole sequence — roughly 1 minute per concluded leg.
-  const elapsedSeconds = legs.length === 0 ? 0 : legs.length * 30 + (h % 20);
+  // Elapsed across the whole sequence — the real clock when live, otherwise a
+  // rough ~30s per concluded leg for the static shapes.
+  const elapsedSeconds = live
+    ? Math.round(liveSeconds ?? 0)
+    : legs.length === 0 ? 0 : legs.length * 30 + (h % 20);
 
   // ── Status-card copy per state (verbatim from the wireframes) ──
   let title = '';
@@ -515,9 +532,15 @@ export function buildBroadcastModel(
         : 'Dispatch manually now to bypass auto-broadcast. Once the hold window closes, drivers will receive order broadcasts.';
       break;
     }
-    case 'broadcasting': {
+    case 'broadcasting':
+    case 'fallback': {
       const leg = liveLeg ?? legs[0];
-      if (marketplace) {
+      // A live sequence walks the ladder and then into the fallback sweep without
+      // the order's status changing, so the card has to follow the ACTIVE LEG
+      // rather than the state name — otherwise the fallback leg rendered as
+      // "Broadcasting to All nearby drivers [Fallback] drivers".
+      const onFallback = leg?.kind === 'fallback' || state === 'fallback';
+      if (marketplace || onFallback) {
         title = 'Broadcasting to all nearby drivers';
       } else if (leg?.kind === 'pre-offer') {
         title = 'Broadcasting to pre-offer drivers';
@@ -529,22 +552,20 @@ export function buildBroadcastModel(
         const rank = leg?.title.match(/\[(P\d+)\]/)?.[1];
         title = `Broadcasting to ${name}${/s$/i.test(name) ? '' : ' drivers'}${rank ? ` [${rank}]` : ''}`;
       }
-      badge = marketplace ? null : roundBadge(leg?.round ?? 1);
+      badge = marketplace ? null : onFallback ? 'Fallback Round' : roundBadge(leg?.round ?? 1);
       subtext = marketplace
         ? 'Drivers near the depot are being notified. Responses appear below as they come in.'
-        : config?.fallbackEnabled
-          ? 'If no one accepts across all priority groups, it will be broadcasted to all available drivers near the depot.'
-          : // No fallback round configured for this depot — say what actually happens.
-            'If no one accepts across all priority groups, you can re-broadcast or dispatch the order manually.';
-      progressPct = 25 + (h % 50);
-      break;
-    }
-    case 'fallback': {
-      title = 'Broadcasting to all nearby drivers';
-      badge = 'Fallback Round';
-      subtext = 'No driver accepted. Broadcasting now to all available drivers near the depot.';
-      progressPct = 30 + (h % 45);
-      inCardNotice = 'If no driver accepts the fallback broadcast, you can re-broadcast the order(s) manually.';
+        : onFallback
+          ? 'No driver accepted. Broadcasting now to all available drivers near the depot.'
+          : config?.fallbackEnabled
+            ? 'If no one accepts across all priority groups, it will be broadcasted to all available drivers near the depot.'
+            : // No fallback round configured for this depot — say what actually happens.
+              'If no one accepts across all priority groups, you can re-broadcast or dispatch the order manually.';
+      // Sequence progress: real when live, hashed only for a static render.
+      progressPct = live ? live.sequencePct : onFallback ? 30 + (h % 45) : 25 + (h % 50);
+      if (onFallback) {
+        inCardNotice = 'If no driver accepts the fallback broadcast, you can re-broadcast the order(s) manually.';
+      }
       break;
     }
     case 'completed': {
@@ -617,5 +638,6 @@ export function buildBroadcastModel(
     showNotifiedDriversLink: legs.length > 0,
     notifiedDrivers,
     batchId,
+    live,
   };
 }

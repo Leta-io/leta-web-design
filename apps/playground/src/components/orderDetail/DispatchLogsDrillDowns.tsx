@@ -221,15 +221,29 @@ function PriorityGroupsScreen({ model }: { model: BroadcastModel }): React.React
         />
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)', width: '100%' }}>
-        {filtered.map((g) => (
-          <DriverGroupCard
-            key={g.priority}
-            group={g}
-            ladder={groups}
-            fallbackEnabled={model.config?.fallbackEnabled ?? false}
-            broadcasting={liveTitle.startsWith(g.name)}
-          />
-        ))}
+        {filtered.map((g) => {
+          // Which group is live comes from the shared broadcast clock, not from
+          // string-matching the status-card title — so as the sequence escalates,
+          // the "Broadcasting" badge moves down the ladder on its own and the
+          // per-attempt bar restarts on each retry instead of sticking at 100%.
+          const gi = groups.indexOf(g);
+          const activeLeg = model.live?.activeIndex != null ? model.live.legs[model.live.activeIndex] : null;
+          const isLive = model.live
+            ? activeLeg?.kind === 'group' && activeLeg.groupIndex === gi
+            : liveTitle.startsWith(g.name);
+          return (
+            <DriverGroupCard
+              key={g.priority}
+              group={g}
+              ladder={groups}
+              fallbackEnabled={model.config?.fallbackEnabled ?? false}
+              broadcasting={!!isLive}
+              elapsedSeconds={isLive ? (model.live?.legElapsedSeconds ?? 0) : 0}
+              attemptPct={isLive ? (model.live?.attemptPct ?? 0) : 0}
+              attempt={isLive ? (model.live?.attempt ?? 1) : 1}
+            />
+          );
+        })}
       </div>
     </div>
   );
