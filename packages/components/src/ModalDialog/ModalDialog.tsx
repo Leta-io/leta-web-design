@@ -7,8 +7,18 @@ import { Button } from '../Button/Button.js';
 import { TextArea } from '../TextArea/TextArea.js';
 import { InputField } from '../InputField/InputField.js';
 import { OptionCard } from '../OptionCard/OptionCard.js';
+import { downloadFile } from '../utils/downloadFile.js';
 import { SIGNATURE_IMAGE } from './signature-asset.js';
 import { DOORSTEP_DELIVERY_IMAGE } from './image-asset.js';
+
+/** Variants that preview a single image (vs. a task-input body). */
+const IMAGE_VARIANTS = new Set<ModalDialogVariant>(['signature', 'image']);
+
+/** Default saved filename per image variant, when `downloadFileName` isn't given. */
+const DEFAULT_DOWNLOAD_FILENAME: Record<'signature' | 'image', string> = {
+  signature: 'signature.png',
+  image: 'proof-of-delivery.jpg',
+};
 
 export type ModalDialogVariant =
   | 'comment'
@@ -32,9 +42,10 @@ export interface ModalDialogProps
   /** Cancel/dismiss label. Default "Close". */
   cancelLabel?: string;
   /**
-   * Render the confirm button. Default true; read-only viewers (the `image` /
-   * `signature` proof dialogs, whose Figma variants carry a single Close
-   * action) pass false for a Close-only footer.
+   * Render the confirm button. Default true. Only applies to the Close/Confirm
+   * footer (`comment` / `form` / `multi-choice`, or `image`/`signature` with
+   * `showDownload={false}`) — the default `image`/`signature` footer is the
+   * single "Download Image" action and ignores this prop.
    */
   showConfirm?: boolean;
   /** Confirm label. Default "Confirm". */
@@ -53,6 +64,23 @@ export interface ModalDialogProps
   onConfirm?: () => void;
   /** Header close handler. Falls back to `onCancel`. */
   onClose?: () => void;
+  /**
+   * `image` / `signature` variants only — show the footer's "Download Image"
+   * action. Defaults to `true` for these two variants (matches Figma) and is
+   * ignored elsewhere. Set `false` to fall back to the standard Close (+
+   * Confirm) footer instead — e.g. a non-proof use of these variants that
+   * still needs a dismiss/confirm pair.
+   */
+  showDownload?: boolean;
+  /** Saved filename for the download. Defaults to `signature.png` / `proof-of-delivery.jpg`. */
+  downloadFileName?: string;
+  /**
+   * Override the download action entirely — e.g. to fetch the full-resolution
+   * file from a different endpoint than the thumbnail shown in the modal, or
+   * to log analytics. Without it, the default behavior downloads `imageSrc` /
+   * `signatureSrc` directly via `downloadFile`.
+   */
+  onDownload?: () => void;
   /**
    * Fixed body height override (px) — replaces the variant's default so a
    * children-composed body can match its wireframe exactly (e.g. the Cancel
@@ -154,14 +182,15 @@ function defaultBody(variant: ModalDialogVariant, imageSrc?: string, signatureSr
  * Modal Dialog (`1317:4855`) — a 512px-wide single-purpose dialog for one focused
  * task: capturing a short input or a small form, previewing a signature or image,
  * or picking from a set of choices. Shell = `ModalHeaders` (default) + body +
- * `FooterFrame` (Close / Confirm). Five `variant`s set the body:
- * - **comment** — a `TextArea` (counter, no label).
- * - **form** — a two-column row of `InputField`s.
+ * `FooterFrame`. Five `variant`s set the body:
+ * - **comment** — a `TextArea` (counter, no label). Footer: Close / Confirm.
+ * - **form** — a two-column row of `InputField`s. Footer: Close / Confirm.
  * - **signature** — a bordered **preview** of a captured signature (480×304;
- *   override via `signatureSrc`).
+ *   override via `signatureSrc`). Footer: a single "Download Image" action
+ *   (dismiss is via the header ×) — see `showDownload`/`downloadFileName`/`onDownload`.
  * - **image** — an image **preview** (480×304, e.g. proof of delivery;
- *   override via `imageSrc`).
- * - **multi-choice** — a vertical list of `OptionCard`s.
+ *   override via `imageSrc`). Footer: same "Download Image" action as `signature`.
+ * - **multi-choice** — a vertical list of `OptionCard`s. Footer: Close / Confirm.
  *
  * Provide `children` to replace any variant's body.
  */
@@ -182,11 +211,25 @@ export const ModalDialog = React.forwardRef<HTMLDivElement, ModalDialogProps>(
       onConfirm,
       showConfirm = true,
       onClose,
+      showDownload,
+      downloadFileName,
+      onDownload,
       bodyHeight,
       ...rest
     },
     ref,
   ) {
+    const isImageVariant = IMAGE_VARIANTS.has(variant);
+    const showDownloadResolved = showDownload ?? isImageVariant;
+
+    const handleDownload =
+      onDownload ??
+      (() => {
+        const src = variant === 'signature' ? signatureSrc ?? SIGNATURE_IMAGE : imageSrc ?? DOORSTEP_DELIVERY_IMAGE;
+        const filename = downloadFileName ?? DEFAULT_DOWNLOAD_FILENAME[variant === 'signature' ? 'signature' : 'image'];
+        void downloadFile(src, filename);
+      });
+
     return (
       <ModalShell
         ref={ref}
@@ -200,20 +243,28 @@ export const ModalDialog = React.forwardRef<HTMLDivElement, ModalDialogProps>(
         }
         footer={
           <FooterFrame variant="default">
-            <Button variant="secondary" size="medium" onClick={onCancel}>
-              {cancelLabel}
-            </Button>
-            {showConfirm && (
-              <Button
-                variant={destructive ? 'destructive' : 'primary'}
-                size="medium"
-                disabled={confirmDisabled}
-                iconLeft={confirmIconLeft}
-                iconOutlined={confirmIconLeft != null}
-                onClick={onConfirm}
-              >
-                {confirmLabel}
+            {isImageVariant && showDownloadResolved ? (
+              <Button variant="secondary" size="medium" iconLeft="Download" onClick={handleDownload}>
+                Download Image
               </Button>
+            ) : (
+              <>
+                <Button variant="secondary" size="medium" onClick={onCancel}>
+                  {cancelLabel}
+                </Button>
+                {showConfirm && (
+                  <Button
+                    variant={destructive ? 'destructive' : 'primary'}
+                    size="medium"
+                    disabled={confirmDisabled}
+                    iconLeft={confirmIconLeft}
+                    iconOutlined={confirmIconLeft != null}
+                    onClick={onConfirm}
+                  >
+                    {confirmLabel}
+                  </Button>
+                )}
+              </>
             )}
           </FooterFrame>
         }

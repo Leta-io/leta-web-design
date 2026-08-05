@@ -31,7 +31,7 @@ import { Popover, MenuPanel, MenuDivider } from '../Popover.js';
 import { buildActivityTrail, DISPATCHER_NAME, type ActivityItem } from './activityModel.js';
 import { CURRENT_USER } from '../../store/currentUser.js';
 import { ActivityTimeline, ActivityComposerSection, ActivityTerminalNotice } from './ActivityTab.js';
-import { buildOrderDetail, type OrderDetailModel, type ProofFile } from './detailModel.js';
+import { buildOrderDetail, proofDownloadFileName, type OrderDetailModel, type ProofFile } from './detailModel.js';
 import { ExpandedMapOverlay } from './OrderDetailMap.js';
 import { OrderOverviewCard } from './OrderOverviewCard.js';
 import { buildBroadcastModel } from './broadcastModel.js';
@@ -1367,8 +1367,7 @@ function DrawerBody({
               title={proofView.title}
               imageSrc={proofView.src}
               signatureSrc={proofView.src}
-              cancelLabel="Close"
-              showConfirm={false}
+              downloadFileName={proofDownloadFileName(order.id, proofView)}
               onCancel={() => setProofView(null)}
               onClose={() => setProofView(null)}
             />

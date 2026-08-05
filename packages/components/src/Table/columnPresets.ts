@@ -102,23 +102,10 @@ const DURATION_FINISHED: TableColumn = DURATION;
  * Present on **every** order table — dispatchers use it to plan routes, choose whom
  * to assign, and judge fulfilment feasibility, so it is not an optional toggle.
  *
- * **Position: immediately after Order ID** (settled 2026-08-05, after trying it
- * both after Recipient and after Route). Keeping it out of the primary flexible
- * block entirely is what fixes the spacing: a right-aligned 90px column placed
- * *between* two flexible columns reads as a void, because each flexible column's
- * unused slack lands against it. Sitting directly after Order ID — itself a
- * low-weight column that usually truncates rather than carrying slack — Distance
- * has no void either side, and the whole primary block (Trip · Driver · Route ·
- * Recipient) stays contiguous. It also lands early in the scan order, which suits
- * a figure dispatchers read on every row while planning assignments.
- *
- * Consequence (§4.3, accepted 2026-08-04): it raises every table's minimum width by
- * 90px, which pushes the two densest shapes past the 1320px design canvas — the
- * dispatched (1346) and finished (1356) views therefore horizontally scroll below
- * those widths, with Order ID pinned left and Actions pinned right. The sparse views
- * (Scheduled/Returned 1076, Pending 1186, Broadcasted 1276, All 980) keep flex-filling
- * with room to spare. Trimming the flexible floors to avoid this was rejected: the
- * Recipient floor exists so the phone never truncates (§6).
+ * **Position: immediately after Recipient** (settled 2026-08-05). Sits between
+ * the last flexible primary column and the first utility column (Duration),
+ * grouping the two right-aligned numeric utilities (Distance · Duration) together
+ * so dispatchers can scan figures without their eyes jumping across flexible text.
  */
 const DISTANCE: TableColumn = { label: 'Distance', role: 'utility', width: 90, align: 'right' };
 const CREATED: TableColumn = { label: 'Created', role: 'utility', width: 120 };
@@ -136,7 +123,7 @@ const ACTIONS_VIEW_LOGS: TableColumn = { label: '', role: 'control', width: 126,
  * a driver and a trip exist. Actions is 64 (overflow only). Duration carries the SLA.
  */
 export const ORDER_TABLE_COLUMNS: TableColumn[] = [
-  ORDER_ID, DISTANCE, TRIP, DRIVER, ROUTE, RECIPIENT, DURATION, CREATED, STATUS, ACTIONS_OVERFLOW,
+  ORDER_ID, TRIP, DRIVER, ROUTE, RECIPIENT, DISTANCE, DURATION, CREATED, STATUS, ACTIONS_OVERFLOW,
 ];
 
 /**
@@ -149,7 +136,7 @@ export const ORDER_TABLE_COLUMNS: TableColumn[] = [
  *   checkbox column the finished shape must not have.
  */
 export const ORDER_TABLE_COLUMNS_FINISHED: TableColumn[] = [
-  ORDER_ID, DISTANCE, TRIP, DRIVER, ROUTE, RECIPIENT, DURATION_FINISHED, CREATED, STATUS, ACTIONS_VIEW_LOGS,
+  ORDER_ID, TRIP, DRIVER, ROUTE, RECIPIENT, DISTANCE, DURATION_FINISHED, CREATED, STATUS, ACTIONS_VIEW_LOGS,
 ];
 
 /**
@@ -158,7 +145,7 @@ export const ORDER_TABLE_COLUMNS_FINISHED: TableColumn[] = [
  * Actions is 154 (Dispatch + overflow). No Batch ID.
  */
 export const UNASSIGNED_ORDER_COLUMNS: TableColumn[] = [
-  ORDER_ID, DISTANCE, ROUTE, RECIPIENT, DURATION, CREATED, STATUS, ACTIONS_DISPATCH,
+  ORDER_ID, ROUTE, RECIPIENT, DISTANCE, DURATION, CREATED, STATUS, ACTIONS_DISPATCH,
 ];
 
 /**
@@ -166,7 +153,7 @@ export const UNASSIGNED_ORDER_COLUMNS: TableColumn[] = [
  * (90px, Primary Identifier) after Order ID — broadcasted orders belong to a batch.
  */
 export const BROADCASTED_ORDER_COLUMNS: TableColumn[] = [
-  ORDER_ID, DISTANCE, BATCH_ID, ROUTE, RECIPIENT, DURATION, CREATED, STATUS, ACTIONS_DISPATCH,
+  ORDER_ID, BATCH_ID, ROUTE, RECIPIENT, DISTANCE, DURATION, CREATED, STATUS, ACTIONS_DISPATCH,
 ];
 
 /**
@@ -174,7 +161,7 @@ export const BROADCASTED_ORDER_COLUMNS: TableColumn[] = [
  * (no SLA until an order enters the active queue) and no Batch ID.
  */
 export const SCHEDULED_ORDER_COLUMNS: TableColumn[] = [
-  ORDER_ID, DISTANCE, ROUTE, RECIPIENT, CREATED, STATUS, ACTIONS_DISPATCH,
+  ORDER_ID, ROUTE, RECIPIENT, DISTANCE, CREATED, STATUS, ACTIONS_DISPATCH,
 ];
 
 /**
@@ -185,7 +172,7 @@ export const SCHEDULED_ORDER_COLUMNS: TableColumn[] = [
  * Use with `<Table selectable={false}>`.
  */
 export const ALL_ORDER_COLUMNS: TableColumn[] = [
-  ORDER_ID, DISTANCE, ROUTE, RECIPIENT, DURATION, CREATED, STATUS,
+  ORDER_ID, ROUTE, RECIPIENT, DISTANCE, DURATION, CREATED, STATUS,
 ];
 
 /**

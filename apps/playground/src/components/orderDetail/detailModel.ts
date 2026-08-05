@@ -81,6 +81,13 @@ export interface ProofFile {
   title: string;
 }
 
+/** Saved filename for a proof viewer's "Download Image" action, e.g. `ORD-1022-proof-of-delivery.jpg`. */
+export function proofDownloadFileName(orderId: string, file: ProofFile): string {
+  const slug = file.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const ext = file.viewer === 'signature' ? 'png' : 'jpg';
+  return `${orderId}-${slug}.${ext}`;
+}
+
 export interface OrderDetailModel {
   order: Order;
   driver: Driver | null;
