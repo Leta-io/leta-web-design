@@ -12,6 +12,7 @@ import {
   type BadgeColor,
 } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
+import { ensureSpinnerStyles, SPINNER_CLASS } from './broadcastSignal.js';
 
 /**
  * Broadcast Event Accordion (Figma `569:61191`, "Broadcast Logs Tab
@@ -22,9 +23,25 @@ import { Icon, type IconName } from '@leta/icons';
  * `@leta/components`.
  *
  * `type="active"` (still broadcasting) buckets drivers into No response /
- * Declined; `type="completed"` (concluded) buckets into Declined / Timed out
+ * Declined; `type="completed"` (concluded) buckets into Timed out / Declined
  * — mirroring the two Figma `Type` variants. Header chip counts are derived
  * from `drivers`, never passed separately, so they can't drift.
+ *
+ * ## What a row's duration means (verified against `569:61190` / `569:61192`)
+ *
+ * The number beside a driver is **not** a per-row timer. Two of the three
+ * statuses read the *leg's* clock and therefore all show the same value —
+ * exactly as both Figma variants render them (four No-response rows at 40s;
+ * two Timed-out rows at 40s):
+ *
+ * | Status | Duration | Spinner |
+ * |---|---|---|
+ * | `no-response` | {@link broadcastSeconds} — the live elapsed time of the broadcast to this leg | yes |
+ * | `timed-out` | {@link broadcastSeconds} — the leg's full course (`acceptanceWindow × retries`) | no |
+ * | `declined` | the driver's own {@link BroadcastDriver.seconds} — when they declined | no |
+ *
+ * A **timed out** badge means the broadcast to this driver ran its full course with
+ * no answer either way; **declined** means they actively refused at `seconds`.
  */
 
 export type DriverResponseStatus = 'no-response' | 'declined' | 'timed-out';
@@ -34,6 +51,12 @@ export interface BroadcastDriver {
   name: string;
   phone: string;
   status: DriverResponseStatus;
+  /**
+   * Seconds into the leg at which this driver **declined**. Only read for
+   * `status: 'declined'` — the awaiting/timed-out statuses share the leg's own
+   * clock (see {@link broadcastSeconds}) rather than carrying a value each.
+   */
+  seconds?: number;
 }
 
 const STATUS_META: Record<
@@ -45,10 +68,14 @@ const STATUS_META: Record<
   'timed-out': { label: 'Timed out', color: 'caution', headerIcon: 'Hourglass', iconColor: 'var(--icons-caution-default)' },
 };
 
-// Which two statuses each accordion Type buckets drivers into, in header order.
+/**
+ * Which two statuses each accordion Type buckets drivers into, **in Figma's header
+ * order** — which is also the list's sort order (`569:61190` leads with No response,
+ * `569:61192` with Timed out; Declined is last in both).
+ */
 const TYPE_STATUSES: Record<'active' | 'completed', [DriverResponseStatus, DriverResponseStatus]> = {
   active: ['no-response', 'declined'],
-  completed: ['declined', 'timed-out'],
+  completed: ['timed-out', 'declined'],
 };
 
 let stylesInjected = false;
@@ -83,26 +110,38 @@ function HeaderChip({ status, count }: { status: DriverResponseStatus; count: nu
 export function BroadcastEventAccordion({
   type,
   drivers,
+  broadcastSeconds,
+  showCallButton = true,
   defaultOpen = true,
 }: {
-  /** Active = still broadcasting (No response/Declined); Completed = concluded (Declined/Timed out). */
+  /** Active = still broadcasting (No response/Declined); Completed = concluded (Timed out/Declined). */
   type: 'active' | 'completed';
   drivers: BroadcastDriver[];
+  /**
+   * The leg's own clock — live elapsed while broadcasting, or the full course
+   * (`acceptanceWindow × retries`) once concluded. Shared by every awaiting and
+   * timed-out row, which is why they all read the same number in Figma. Declined
+   * rows ignore it in favour of their own `seconds`.
+   */
+  broadcastSeconds: number;
+  /**
+   * Whether each row offers a Call button (plus the divider that precedes it).
+   *
+   * **Not derivable from `type`** — verified across the wireframes: Exhausted
+   * (`552:57340`) and Manually Dispatched after exhausted (`1728:124762`) both render
+   * an open **Completed** accordion, yet the first shows the button and the second
+   * hides it. The difference is whether the order already has a driver: once it does,
+   * chasing the drivers who passed on it is pointless. The caller passes that signal
+   * (`DispatchNarrative.method !== 'none'`) — see `DispatchLogsTab`.
+   */
+  showCallButton?: boolean;
   defaultOpen?: boolean;
 }): React.ReactElement {
   ensureStyles();
+  ensureSpinnerStyles();
   const { open, toggle } = useAccordion(defaultOpen);
   const [filter, setFilter] = React.useState<'all' | DriverResponseStatus>('all');
   const statuses = TYPE_STATUSES[type];
-
-  // Live elapsed response-window counter (shared across rows, per Figma's
-  // uniform "5s" reading) — only ticks while the broadcast is still active.
-  const [elapsed, setElapsed] = React.useState(5);
-  React.useEffect(() => {
-    if (type !== 'active') return;
-    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(t);
-  }, [type]);
 
   const counts = React.useMemo(() => {
     const c = {} as Record<DriverResponseStatus, number>;
@@ -110,7 +149,26 @@ export function BroadcastEventAccordion({
     return c;
   }, [drivers, statuses]);
 
-  const filtered = filter === 'all' ? drivers : drivers.filter((d) => d.status === filter);
+  /** The duration this row displays — see the table in the component JSDoc. */
+  const secondsFor = (d: BroadcastDriver): number =>
+    d.status === 'declined' ? (d.seconds ?? 0) : broadcastSeconds;
+
+  /**
+   * Figma's ordering (`569:61192`: Timed out 40s, 40s → Declined 38s, 32s, 30s):
+   * **bucket first** in header order — the drivers the broadcast is still waiting on
+   * (or that ran out the clock) lead, the ones who actively said no sink to the
+   * bottom — **then longest duration first** inside each bucket.
+   */
+  const sorted = React.useMemo(() => {
+    const rank = (d: BroadcastDriver) => {
+      const i = statuses.indexOf(d.status);
+      return i === -1 ? statuses.length : i;
+    };
+    return [...drivers].sort((a, b) => rank(a) - rank(b) || secondsFor(b) - secondsFor(a));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drivers, statuses, broadcastSeconds]);
+
+  const filtered = filter === 'all' ? sorted : sorted.filter((d) => d.status === filter);
 
   return (
     <div
@@ -185,19 +243,33 @@ export function BroadcastEventAccordion({
                   showPassiveElements
                   passiveElements={
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
+                      {/* Still waiting on this driver → the live blue spinner, leading the
+                          time (Figma `Metadata Text`: H, gap 8, icon first). Declined and
+                          timed-out rows have nothing left to wait for, so no spinner. */}
+                      {driver.status === 'no-response' && (
+                        <span className={SPINNER_CLASS} style={{ display: 'flex', color: 'var(--icons-information-default)' }}>
+                          <Icon name="Loading" size={16} />
+                        </span>
+                      )}
                       <span
                         className="text-label-s-regular"
-                        style={{ color: 'var(--text-default-sub-body)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}
+                        style={{ color: 'var(--text-default-label-idle)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}
                       >
-                        {elapsed}s
+                        {secondsFor(driver)}s
                       </span>
-                      <div style={{ width: 0, height: 20, borderLeft: 'var(--stroke-xs) solid var(--border-neutral-default)' }} />
+                      {/* The divider belongs to the Call button — both disappear together
+                          once the order has a driver (see `showCallButton`). */}
+                      {showCallButton && (
+                        <div style={{ width: 0, height: 20, borderLeft: 'var(--stroke-xs) solid var(--border-neutral-default)' }} />
+                      )}
                     </div>
                   }
-                  showInteractiveElements
+                  showInteractiveElements={showCallButton}
                   interactiveElements={
                     // Inert per project decision — no call-integration flow exists yet.
-                    <Button variant="secondary" size="medium" iconOnly="Phone" iconOutlined aria-label="Call driver" />
+                    showCallButton ? (
+                      <Button variant="secondary" size="medium" iconOnly="Phone" iconOutlined aria-label={`Call ${driver.name}`} />
+                    ) : undefined
                   }
                 />
               </React.Fragment>

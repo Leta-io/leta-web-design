@@ -9,7 +9,13 @@ import type {
 } from '../../store/types.js';
 import { idHash, MONTHS } from '../../lib/orderMeta.js';
 import type { DispatchNarrative } from '../../lib/dispatchNarrative.js';
-import { PRE_OFFER_SECONDS, resolveLive, sequenceTotalSeconds, type LiveSequence } from './liveBroadcast.js';
+import {
+  FALLBACK_SECONDS,
+  PRE_OFFER_SECONDS,
+  resolveLive,
+  sequenceTotalSeconds,
+  type LiveSequence,
+} from './liveBroadcast.js';
 import type { BroadcastDriver, DriverResponseStatus } from './BroadcastEventAccordion.js';
 
 /**
@@ -64,6 +70,16 @@ export interface BroadcastLeg {
   outcome: 'broadcasting' | 'accepted' | 'unaccepted';
   /** "10s elapsed · 5 drivers found" (live) or "Ran for 20s · 5 drivers found" (concluded). */
   subtext: string;
+  /**
+   * How long the broadcast to this leg ran — live elapsed while it is the active leg,
+   * otherwise its **full course**: a group leg is `acceptanceWindow × retries` (each
+   * retry re-runs the same window), pre-offer and fallback are single-attempt.
+   *
+   * Deliberately ONE number feeding both the leg's own "Ran for Ns" subtext and every
+   * awaiting/timed-out driver row beneath it — a leg that reported "Ran for 40s" over
+   * rows claiming 80s would be self-contradictory.
+   */
+  broadcastSeconds: number;
   /** Timestamp shown right-aligned in the entry header. */
   timestamp: string;
   /** The drivers this leg reached, with their responses. */
@@ -138,6 +154,18 @@ export interface BroadcastModel {
   legs: BroadcastLeg[];
   /** Empty-state copy when `legs` is empty. */
   emptyDescription: string | null;
+  /**
+   * Whether the order already has a driver — the gate for the per-row Call button in
+   * every broadcast accordion (see `BroadcastEventAccordion`'s `showCallButton`).
+   *
+   * Read straight off {@link DispatchNarrative.method} rather than inferred from
+   * `state`: the wireframes prove the accordion Type cannot decide this. Exhausted
+   * (`552:57340`) and Manually Dispatched after exhausted (`1728:124762`) both show an
+   * **open Completed accordion**, but only the first keeps the Call buttons — because
+   * only the second has a driver. Once the job is taken, calling the drivers who
+   * declined or timed out has no purpose.
+   */
+  driverAssigned: boolean;
   /** Whether the Priority Driver Groups drill-down is reachable (managed-fleet only). */
   showPriorityGroupsLink: boolean;
   /** Whether the Notified Drivers drill-down is reachable (any log-bearing state). */
@@ -200,17 +228,66 @@ const GROUP_SUFFIX: Record<string, string> = {
   Floaters: 'Floaters',
 };
 
-/** Deterministic per-leg driver slice + response mix. */
-function legDrivers(seed: number, count: number, live: boolean, accepted: boolean): BroadcastDriver[] {
+/**
+ * The fixed second, within a leg's window, at which driver `i` declines.
+ *
+ * Anchored to the leg's **full course** and nothing else — deliberately not to the live
+ * elapsed time. Deriving it from a ticking clock made a decline creep upward second by
+ * second (6s → 13s), reading as though the driver were refusing over and over. Spread
+ * across the back half of the window and descending with `i`, so a sorted list reads like
+ * real staggered responses (Figma's 38s / 32s / 30s) instead of a run of equal values.
+ */
+function declineAnchor(seed: number, i: number, nominalSeconds: number): number {
+  const span = Math.max(1, Math.floor(nominalSeconds / 2));
+  return Math.max(1, nominalSeconds - 1 - ((seed + i * 5) % span));
+}
+
+/**
+ * Deterministic per-leg driver slice + response mix.
+ *
+ * Only **declined** drivers get a `seconds` of their own — the moment they refused.
+ * Awaiting and timed-out rows read the leg's clock instead (see
+ * `BroadcastEventAccordion`), which is what makes them all show one number.
+ *
+ * @param nominalSeconds the leg's **full course** (`acceptanceWindow × retries`), the basis
+ *   for every {@link declineAnchor}.
+ * @param elapsedSeconds present only for the live leg: how far it has actually run. A
+ *   driver whose anchor is still in the future simply **hasn't answered yet** — they stay
+ *   `no-response` until the clock reaches it, then flip to `declined` and freeze there.
+ *   (Clamping the displayed value to `elapsed` instead was the first attempt and still
+ *   crept, because it re-reported "declined just now" on every tick.)
+ */
+function legDrivers(
+  seed: number,
+  count: number,
+  live: boolean,
+  accepted: boolean,
+  nominalSeconds: number,
+  elapsedSeconds?: number,
+): BroadcastDriver[] {
   const out: BroadcastDriver[] = [];
   for (let i = 0; i < count; i++) {
     const p = DRIVER_POOL[(seed + i * 3) % DRIVER_POOL.length]!;
-    // Live legs are still waiting on most drivers; concluded legs resolved to
-    // declined/timed-out (an accepted leg's acceptor renders separately).
-    let status: DriverResponseStatus;
-    if (live) status = i === count - 1 ? 'declined' : 'no-response';
-    else status = (seed + i) % 5 === 0 || i >= count - 2 ? 'timed-out' : 'declined';
-    out.push({ id: `${seed}-${i}`, name: p.name, phone: p.phone, status });
+    const d: BroadcastDriver = { id: `${seed}-${i}`, name: p.name, phone: p.phone, status: 'no-response' };
+    if (live) {
+      // One driver in a live leg is the designated decliner — but only once their anchor
+      // has actually elapsed. Everyone else is still being waited on.
+      const anchor = declineAnchor(seed, i, nominalSeconds);
+      if (i === count - 1 && (elapsedSeconds == null || Math.round(elapsedSeconds) >= anchor)) {
+        d.status = 'declined';
+        d.seconds = anchor;
+      }
+    } else {
+      // Concluded legs resolved to declined/timed-out (an accepted leg's acceptor
+      // renders separately, above the accordion).
+      if ((seed + i) % 5 === 0 || i >= count - 2) {
+        d.status = 'timed-out';
+      } else {
+        d.status = 'declined';
+        d.seconds = declineAnchor(seed, i, nominalSeconds);
+      }
+    }
+    out.push(d);
   }
   if (accepted) out.shift(); // the acceptor is surfaced via `acceptedBy`
   return out;
@@ -272,7 +349,8 @@ function buildManagedLegs(
     kind: BroadcastLegKind,
     title: string,
     round: number | null,
-    windowSeconds: number,
+    /** The leg's FULL course — already multiplied by `retries` for a group leg. */
+    runSeconds: number,
     driverCount: number,
     footnote?: string,
   ) => {
@@ -284,9 +362,10 @@ function buildManagedLegs(
       // Placeholders — outcome/subtext/open state are stamped after the full list is
       // known (only the final leg can be live, only one leg can be the acceptor).
       outcome: 'unaccepted',
-      subtext: fmtRan(windowSeconds, false, driverCount),
+      subtext: fmtRan(runSeconds, false, driverCount),
+      broadcastSeconds: runSeconds,
       timestamp: fmtStamp(base, minute),
-      drivers: legDrivers(h + legIndex * 7, driverCount, false, false),
+      drivers: legDrivers(h + legIndex * 7, driverCount, false, false, runSeconds),
       footnote,
       accordionType: 'completed',
       defaultOpen: false,
@@ -298,14 +377,22 @@ function buildManagedLegs(
   for (let round = 1; round <= opts.reachedRounds; round++) {
     // Pre-offer leads round 1 only, and only when the depot enables it.
     if (round === 1 && config.preOfferEnabled) {
-      push('pre-offer', 'Pre-Offer', 1, 20, 2, 'Pre-offers are sent to drivers already on a compatible route.');
+      push('pre-offer', 'Pre-Offer', 1, PRE_OFFER_SECONDS, 2, 'Pre-offers are sent to drivers already on a compatible route.');
     }
     for (const g of config.groups) {
-      push('group', `${g.name} [P${g.priority}]`, round, g.acceptanceWindowSeconds, Math.min(g.totalDrivers, 5));
+      // A group leg runs its acceptance window once per retry — the full course is the
+      // product, and that is the span a "Timed out" driver sat through.
+      push(
+        'group',
+        `${g.name} [P${g.priority}]`,
+        round,
+        g.acceptanceWindowSeconds * Math.max(1, g.retries),
+        Math.min(g.totalDrivers, 5),
+      );
     }
   }
   if (opts.reachedFallback) {
-    push('fallback', 'All nearby drivers [Fallback]', null, 40, 5);
+    push('fallback', 'All nearby drivers [Fallback]', null, FALLBACK_SECONDS, 5);
   }
 
   if (legs.length === 0) return legs;
@@ -313,18 +400,20 @@ function buildManagedLegs(
   // Stamp the terminal leg: live (still broadcasting) or the acceptor.
   const last = legs[legs.length - 1]!;
   if (opts.liveLeg) {
-    const windowSeconds = last.kind === 'group'
-      ? config.groups.find((g) => last.title.startsWith(g.name))?.acceptanceWindowSeconds ?? 40
-      : 40;
+    // The leg's own full course, captured before the live elapsed overwrites it — decline
+    // moments anchor to this fixed span, not to the moving clock.
+    const nominal = last.broadcastSeconds;
     // The live leg counts up from the shared clock when there is one; the hashed
     // value is only a fallback for a static render.
     const elapsed = opts.liveLegElapsed != null
       ? Math.max(0, Math.round(opts.liveLegElapsed))
-      : Math.max(5, (h % windowSeconds) || 10);
+      : Math.max(5, (h % Math.max(1, nominal)) || 10);
     last.outcome = 'broadcasting';
     last.accordionType = 'active';
     last.subtext = fmtRan(elapsed, true, last.drivers.length);
-    last.drivers = legDrivers(h + (legIndex - 1) * 7, last.drivers.length, true, false);
+    // Live: the leg's clock IS the elapsed time so far — every awaiting row reads it.
+    last.broadcastSeconds = elapsed;
+    last.drivers = legDrivers(h + (legIndex - 1) * 7, last.drivers.length, true, false, nominal, elapsed);
   } else if (opts.acceptedAt != null && opts.acceptor) {
     const leg = legs[opts.acceptedAt];
     if (leg) {
@@ -347,14 +436,18 @@ function buildMarketplaceLeg(
   acceptor: Acceptor | null,
 ): BroadcastLeg[] {
   const h = idHash(order.id);
-  const drivers = legDrivers(h, 5, live, accepted);
+  const runSeconds = live ? Math.max(5, h % FALLBACK_SECONDS) : FALLBACK_SECONDS;
+  // Same split as the managed live leg: anchor declines to the full sweep window, clamp
+  // them to however far this one has actually run.
+  const drivers = legDrivers(h, 5, live, accepted, FALLBACK_SECONDS, live ? runSeconds : undefined);
   const leg: BroadcastLeg = {
     id: 'leg-flat',
     kind: 'fallback',
     title: 'All nearby drivers',
     round: null,
     outcome: live ? 'broadcasting' : accepted ? 'accepted' : 'unaccepted',
-    subtext: fmtRan(live ? Math.max(5, h % 40) : 40, live, drivers.length + (accepted ? 1 : 0)),
+    subtext: fmtRan(runSeconds, live, drivers.length + (accepted ? 1 : 0)),
+    broadcastSeconds: runSeconds,
     timestamp: fmtStamp(base, 0),
     drivers,
     accordionType: live ? 'active' : 'completed',
@@ -569,12 +662,16 @@ export function buildBroadcastModel(
       break;
     }
     case 'completed': {
-      const at = acceptedLeg?.title.replace(/\s*\[(P\d)\]$/, ' ($1)') ?? 'the broadcast';
+      // Bracket form throughout (ruled 2026-08-05) — the leg title already carries it
+      // ("In-house [P1]"), so no reformatting is needed; previously this rewrote it into
+      // prose parens ("In-house (P1)"), the one inconsistency left after the escalation
+      // banner switched to brackets.
+      const at = acceptedLeg?.title ?? 'the broadcast';
       title = marketplace ? 'Broadcast resolved' : `Broadcast Resolved at ${acceptedLeg?.title ?? ''}`.trim();
       badge = marketplace ? null : roundBadge(acceptedLeg?.round ?? 1);
       subtext = acceptedLeg?.acceptedBy
         ? legs.length > 1
-          ? `${acceptedLeg.acceptedBy.name} accepted after the broadcast to ${legs[1]?.title.replace(/\s*\[(P\d)\]$/, ' ($1)') ?? 'earlier drivers'} was unaccepted.`
+          ? `${acceptedLeg.acceptedBy.name} accepted after the broadcast to ${legs[1]?.title ?? 'earlier drivers'} was unaccepted.`
           : `${acceptedLeg.acceptedBy.name} accepted the broadcast at ${at}.`
         : 'A driver accepted the broadcast.';
       break;
@@ -633,6 +730,7 @@ export function buildBroadcastModel(
     },
     legs,
     emptyDescription,
+    driverAssigned: narrative.method !== 'none',
     // Marketplace tenants have no driver groups, so the drill-down doesn't exist.
     showPriorityGroupsLink: !marketplace && !!config && state !== 'manual-before-broadcast',
     showNotifiedDriversLink: legs.length > 0,

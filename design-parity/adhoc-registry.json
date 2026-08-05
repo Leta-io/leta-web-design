@@ -2,7 +2,9 @@
   "components": [
     {
       "name": "SLA Visibility",
-      "sourceFiles": ["LETA Playground — View Order Drawer/Overview (320:99590)"],
+      "sourceFiles": [
+        "LETA Playground — View Order Drawer/Overview (320:99590)"
+      ],
       "nodeId": "364:49284",
       "description": "Summary-card SLA block: eyebrow label + ⓘ tooltip, elapsed counter (bold dark) + ' / 30m SLA' (grey), optional trailing SLA badge (On-Time/At Risk/Delayed/Prev: duration).",
       "firstSeen": "2026-07-20",
@@ -10,7 +12,9 @@
     },
     {
       "name": "Order Detail Accordions",
-      "sourceFiles": ["LETA Playground — Order Management / Order Management Components (852:159917)"],
+      "sourceFiles": [
+        "LETA Playground — Order Management / Order Management Components (852:159917)"
+      ],
       "nodeId": "1454:194015",
       "componentType": "COMPONENT_SET",
       "description": "Real, reusable local Figma component (not an ad-hoc reconstruction) for every collapsible section in the View Order drawer body: Variant=Pickup From / Pickup From + Proof of Pickup / Deliver To / Proof of Delivery / Items / Payment Info / More Info (Pre-Dispatch / Post Assignment / Post Completion) × Size=Open/Closed × State=Idle/Hover. Structure: a Content Primitives (Section Heading) header — title + chevron toggle in Trailing Content's Interactive Elements slot — over a List Group of Content Primitives (Vertical List Row) fields, in a bordered/rounded card (fill --surface-neutral-bg-default, border --border-neutral-default, radius --rounding-xl/12, pad 20, header→body gap 12, field-row gap 20). Implemented in code as the local `Section`/`Field`/`FieldRows` helpers in apps/playground/src/components/orderDetail/OrderDetailDrawer.tsx — verified structurally matching this component (padding/radius/gaps/tokens all line up); kept as local composition rather than promoted to @leta/components because it is Playground-specific drawer chrome, not a general-purpose DS molecule.",
@@ -20,7 +24,9 @@
     },
     {
       "name": "Order Overview Card",
-      "sourceFiles": ["LETA Playground — Order Management / Order Management Components (852:159917)"],
+      "sourceFiles": [
+        "LETA Playground — Order Management / Order Management Components (852:159917)"
+      ],
       "nodeId": "1452:181083",
       "componentType": "COMPONENT_SET",
       "reEnumerated": "2026-07-27",
@@ -32,7 +38,9 @@
     },
     {
       "name": "Pickup Code Banner",
-      "sourceFiles": ["LETA Playground — Order Management / Order Management Components / Miscellaneous order view components (1454:207950)"],
+      "sourceFiles": [
+        "LETA Playground — Order Management / Order Management Components / Miscellaneous order view components (1454:207950)"
+      ],
       "nodeId": "1454:207769",
       "componentType": "COMPONENT",
       "description": "Real, reusable local Figma component (renamed in Figma from the earlier 'Picup Code Banner' typo on 2026-07-27) — supersedes the prior 'Pickup Code digits' ad-hoc entry (stale nodeId 271:36357, from the original Overview wireframe before the designer componentized it). Lavender --surface-secondary-bg-raised card, radius --rounding-lg, pad 16px 20px; dark-navy --surface-secondary-bg digit boxes (radius --rounding-md) with white --text-on-color-label text; title in --text-secondary-label; Plain Copy-Outline button. Implemented in OrderDetailDrawer.tsx (the pickup-code banner block, rebuilt to match this component 2026-07-21 per the 13-screen reconciliation pass).",
@@ -42,7 +50,9 @@
     },
     {
       "name": "Map Legend",
-      "sourceFiles": ["LETA Playground — Order Management / Expanded Map Modals (1522:115768)"],
+      "sourceFiles": [
+        "LETA Playground — Order Management / Expanded Map Modals (1522:115768)"
+      ],
       "nodeId": "1528:119929",
       "componentType": "COMPONENT_SET",
       "description": "Real, reusable local Figma component — the route key pill pinned bottom-centre of the expanded order map. Property 1=1 Route / 2 Routes. Pill: --surface-neutral-bg-default, 1px --border-neutral-default, --rounding-round, height 40, pad [10,16], gap 16. Each item = a 32px sample line + Label/S/Medium caption: 'Planned Route' (dark #192037, dashed 3/3) and 'Driven Route' (red #ff3941, solid), split by a 20px vertical demarcator. Shown only when a route is drawn — hidden pre-dispatch and for cancelled-before-dispatch. Implemented as the local MapLegend in apps/playground/src/components/orderDetail/OrderDetailMap.tsx.",
@@ -51,7 +61,9 @@
     },
     {
       "name": "Map Fixed Banners",
-      "sourceFiles": ["LETA Playground — Order Management / Expanded Map Modals (1522:115768)"],
+      "sourceFiles": [
+        "LETA Playground — Order Management / Expanded Map Modals (1522:115768)"
+      ],
       "nodeId": "1528:120794",
       "componentType": "COMPONENT_SET",
       "description": "Real, reusable local Figma component — the dark status banner pinned top-centre of the expanded order map. 9 variants (Unassigned · Returned · Assigned · At Depot · In Transit · Arrived · Returning · Delivered · Cancelled). 480×44, HORIZONTAL gap 16, pad [12,16], --rounding-lg, fill --surface-secondary-bg (#192037); leading 18px icon + Body/M/Regular --text-on-color-label copy, a 20px vertical demarcator, then a trailing Desktop Button (Plain/Small, underlined, white label) reading Dispatch or View Activity. Implemented as the local MapFixedBanner in OrderDetailMap.tsx (Plain button recoloured for the dark surface via the --leta-btn-text custom properties).",
@@ -60,7 +72,9 @@
     },
     {
       "name": "Proof image row (Base Card)",
-      "sourceFiles": ["LETA Playground — View Order Drawer/Overview (320:99590)"],
+      "sourceFiles": [
+        "LETA Playground — View Order Drawer/Overview (320:99590)"
+      ],
       "nodeId": "1418:458603",
       "description": "Image-thumb + filename ('Image.png') + Secondary View button; used for Proof of Pickup / Proof of Delivery / Recipient Signature rows.",
       "firstSeen": "2026-07-20",
@@ -68,13 +82,37 @@
     },
     {
       "name": "Map Card",
-      "sourceFiles": ["LETA Playground — Order Management / Order Management Components / Miscellaneous order view components (1454:207950)"],
+      "sourceFiles": [
+        "LETA Playground — Order Management / Order Management Components / Miscellaneous order view components (1454:207950)"
+      ],
       "nodeId": "1454:207949",
       "componentType": "COMPONENT_SET",
       "description": "Real, reusable local Figma component (not an ad-hoc reconstruction) — supersedes the prior 'Expanded-map info card' ad-hoc entry (stale nodeId 1419:462091, from the original Overview wireframe before the designer componentized it). Property 1=Pickup / Property 1=Drop-off variants: white floating card affixed to a map pin — leading icon tile + name + truncated address. Exact geometry (re-read 2026-07-27): 250×56, VERTICAL, pad 8, --rounding-xl (12), fill --surface-neutral-bg-default, 1px --border-neutral-default, 3-layer drop shadow (--shadow-neutral-2); Content HORIZONTAL gap 8 = a 40×40 --surface-neutral-bg-tertiary tile at --rounding-lg holding a 20px outlined icon, then a VERTICAL gap-4 stack of Label/S/SemiBold title (--text-default-heading) + Label/S/Regular address (--text-default-sub-body), both ellipsis-truncated. Rendered in OrderDetailMap.tsx as a Leaflet divIcon anchored centred ~18px above its pin.",
       "firstSeen": "2026-07-20",
       "reconciledAgainstRealComponent": "2026-07-27",
       "occurrences": 4
+    },
+    {
+      "name": "Broadcast Event Accordion",
+      "sourceFiles": [
+        "LETA Playground — Order Management / Broadcast Logs Tab components (569:61920)"
+      ],
+      "nodeId": "569:61191",
+      "componentType": "COMPONENT_SET",
+      "description": "Real, reusable local Figma component for one broadcast event in the Dispatch Logs timeline: Type=Active/Completed x Size=Open/Closed x State=Idle/Hover. Header (H, gap 20, pad 12; fill --surface-neutral-bg-subtle idle / bg-muted hover) shows two derived response-bucket chips separated by a 1px rule — Active: No response (Clock-Outline) | Declined (Cancel); Completed: Timed out (Hourglass-Outline) | Declined — plus a chevron. Open reveals a filter chip row (All + the two buckets) over a Drivers List (V, gap 16) of Content Primitives utility rows (Avatar 40, name + status Desktop Badge, phone, trailing duration + optional Call button), 1px Demarcator between rows. Rows sort by bucket then duration desc; awaiting/timed-out rows share the leg's clock (awaiting ones carry a rotating Icon/Loading in --icons-information-default), declined rows carry their own moment.",
+      "firstSeen": "2026-08-03",
+      "occurrences": 13
+    },
+    {
+      "name": "Driver Group Cards",
+      "sourceFiles": [
+        "LETA Playground — Order Management / Broadcast Logs Tab components (569:61920)"
+      ],
+      "nodeId": "1707:120011",
+      "componentType": "COMPONENT_SET",
+      "description": "Real, reusable local Figma component for one priority tier of a depot's driver-group ladder, shown in the Dispatch Logs Priority Driver Groups drill-down: State=Default/Broadcasting x Type=P1/P2/P3. Header (pad 20) = priority chip + '{Group} [Pn]' + (Broadcasting only) a Desktop Badge with cycling signal bars and a trailing rotating Icon/Loading + 'Ns elapsed - M drivers found'; a 1px rule; then a body (pad 20, gap 16) of four Content Primitives horizontal-list-rows — Acceptance window (Timer-Outline), Retries (Icon/Refresh, filled), Max orders (Orders-Outline), Total drivers (Account-Outline) — over a neutral/filled Notification Banner carrying the escalation rule. Broadcasting also pins a 4px --icons-information-default progress bar to the top edge, filling one acceptance window per retry.",
+      "firstSeen": "2026-08-03",
+      "occurrences": 6
     }
   ]
 }

@@ -15,6 +15,32 @@ export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
 
+/**
+ * The shared "waiting on a response" spinner — a rotating `Icon/Loading` in
+ * `--icons-information-default`. Figma uses the identical treatment in two places
+ * (Driver Group Card's live header meta `1707:120008`, and every still-awaiting
+ * driver row inside an Active Broadcast Event Accordion `569:61190`), so the
+ * keyframes live here rather than being re-declared per component — two copies
+ * would be free to drift out of sync.
+ *
+ * Apply the class AND the colour: `<span className={SPINNER_CLASS} style={{ display: 'flex',
+ * color: 'var(--icons-information-default)' }}><Icon name="Loading" size={16} /></span>`.
+ */
+export const SPINNER_CLASS = 'leta-broadcast-spinner';
+
+let spinnerInjected = false;
+export function ensureSpinnerStyles(): void {
+  if (spinnerInjected || typeof document === 'undefined') return;
+  spinnerInjected = true;
+  const el = document.createElement('style');
+  el.setAttribute('data-leta', 'broadcast-spinner');
+  el.textContent = `
+@keyframes leta-broadcast-spin { to { transform: rotate(360deg); } }
+.${SPINNER_CLASS} { animation: leta-broadcast-spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .${SPINNER_CLASS} { animation: none; } }`;
+  document.head.appendChild(el);
+}
+
 /** Returns the current signal-bar icon, cycling while `active`. Settles on the full
  *  3-bar icon when inactive or under `prefers-reduced-motion`. */
 export function useBroadcastSignalIcon(active: boolean): IconName {

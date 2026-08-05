@@ -48,6 +48,28 @@ const BODY: React.CSSProperties = {
 };
 
 /**
+ * Body variant for a drill-down whose content is a **table** rather than a list.
+ *
+ * The list screens let their content grow and scroll the whole `ModalShell` body.
+ * A table must not do that: scrolling the page pushes the Pagination controls below
+ * the fold, so they can only be reached by scrolling past every row. Instead the body
+ * is pinned to the shell's height and never scrolls itself — the table fills it
+ * (`fillHeight`) and scrolls its own rows internally, keeping Pagination fixed and
+ * always reachable. Same model as the main Orders table in `Page`.
+ *
+ * Bottom padding drops to 16 (from the list screens' 24) so the table stops short of
+ * the shell's edge instead of sitting flush against it.
+ */
+const BODY_TABLE: React.CSSProperties = {
+  ...BODY,
+  padding: 'var(--padding-24px) var(--padding-16px) var(--padding-16px)',
+  boxSizing: 'border-box',
+  height: '100%',
+  minHeight: 0,
+  overflow: 'hidden',
+};
+
+/**
  * Drill-down toolbar — the wireframes' `Table Data Control` with everything except
  * the search field and the count switched off: the Created / Filter / Sort buttons
  * and the Columns button are all `visible: false` in Figma, and the project rule is
@@ -189,28 +211,58 @@ const BATCH_COLUMNS: TableColumn[] = [
   { label: 'Status', role: 'secondary', width: 140 },
 ];
 
+/** Batch rows per page — matches the Orders table's default page size. */
+const BATCH_PAGE_SIZE = 10;
+
 function BatchedOrdersScreen({ model, depotName, order }: { model: BroadcastModel; depotName: string; order: Order }): React.ReactElement {
   const [query, setQuery] = React.useState('');
+  const [page, setPage] = React.useState(1);
   const rows = React.useMemo(() => batchRows(model, depotName, order), [model, depotName, order]);
   const filtered = query.trim()
     ? rows.filter((r) => JSON.stringify(r.cells).toLowerCase().includes(query.trim().toLowerCase()))
     : rows;
 
+  // `Table` renders the Pagination footer but does NOT slice — the host owns paging
+  // (same contract the Orders table uses). Left unpassed, `countLabel`/`pageCount`
+  // fall back to their placeholder defaults ("Showing 10 of 180", 10 pages), which
+  // only became visible once the footer stopped being pushed off-screen.
+  const pageCount = Math.max(1, Math.ceil(filtered.length / BATCH_PAGE_SIZE));
+  const current = Math.min(page, pageCount);
+  const pageRows = filtered.slice((current - 1) * BATCH_PAGE_SIZE, current * BATCH_PAGE_SIZE);
+  // A narrowed search can leave the current page out of range — go back to the first.
+  const onQuery = (q: string) => { setQuery(q); setPage(1); };
+
   return (
-    <div style={BODY}>
+    <div style={BODY_TABLE}>
       <DrillToolbar
         leading={`Batch ID: ${model.batchId}`}
         count={`${filtered.length} Orders`}
         query={query}
-        onQuery={setQuery}
+        onQuery={onQuery}
       />
       {/* `complex` (80px) rows — same density as the main Orders table; the
           address cell needs the two-line height, and a shorter `basic` row was
-          the reported height mismatch. */}
+          the reported height mismatch.
+
+          `fillHeight`: the table takes the remaining height of the pinned body and
+          scrolls its rows internally, so Pagination stays put at the bottom instead
+          of being pushed off-screen (see {@link BODY_TABLE}). */}
       {filtered.length === 0 ? (
         <DrillEmpty noun="orders" />
       ) : (
-        <Table columns={BATCH_COLUMNS} rows={filtered} selectable={false} scrollX="auto" rowVariant="complex" />
+        <Table
+          columns={BATCH_COLUMNS}
+          rows={pageRows}
+          selectable={false}
+          scrollX="auto"
+          rowVariant="complex"
+          fillHeight
+          page={current}
+          pageCount={pageCount}
+          onPageChange={setPage}
+          rowsPerPage={BATCH_PAGE_SIZE}
+          countLabel={`Showing ${pageRows.length} of ${filtered.length}`}
+        />
       )}
     </div>
   );

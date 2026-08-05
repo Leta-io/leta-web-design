@@ -286,14 +286,15 @@ function BroadcastStatusCard({
 }
 
 /** Outcome badge per leg — matches the wireframes' Desktop Badge instances.
- *  Unaccepted uses the outlined **Deactivate** icon (Figma); Broadcasting's
- *  signal bars and Accepted's Check-Circle are filled, per the same wireframes. */
+ *  Unaccepted uses the outlined **Deactivate** icon (Figma); Broadcasting's signal bars
+ *  and Accepted's **plain `Check`** are filled. (Accepted is `Icon/Check`, verified on
+ *  the accepted-leg card `1707:121735` — not the circled `Check-Circle`.) */
 const OUTCOME_BADGE: Record<
   BroadcastLeg['outcome'],
-  { label: string; color: 'information' | 'success' | 'neutral'; icon?: 'Signal-3-Bars' | 'Check-Circle' | 'Deactivate'; outlined?: boolean }
+  { label: string; color: 'information' | 'success' | 'neutral'; icon?: 'Signal-3-Bars' | 'Check' | 'Deactivate'; outlined?: boolean }
 > = {
   broadcasting: { label: 'Broadcasting', color: 'information', icon: 'Signal-3-Bars' },
-  accepted: { label: 'Accepted', color: 'success', icon: 'Check-Circle' },
+  accepted: { label: 'Accepted', color: 'success', icon: 'Check' },
   unaccepted: { label: 'Unaccepted', color: 'neutral', icon: 'Deactivate', outlined: true },
 };
 
@@ -338,33 +339,46 @@ function RoundMarker({
   );
 }
 
-/** The accepting driver's row, shown above the non-responder accordion on an Accepted leg. */
+/**
+ * The accepting driver's row, shown above the non-responder accordion on an Accepted leg.
+ *
+ * Wrapped in its **own nested `ContentCard`** — the accepted-leg card `1707:121735` puts a
+ * second, inset Content Card (672×76, pad 16, radius 12, 1px border) around this row, which
+ * is what visually lifts the driver who took the job out of the surrounding card. It keeps
+ * its Call button even when the rest of the log hides them: this is the assigned driver, the
+ * one person worth phoning.
+ *
+ * The padding override is deliberate: `ContentCard`'s own 20px is the *outer* card's
+ * padding, but Figma insets this nested one at 16 (hence 672×**76**, not 86).
+ */
 function AcceptedRow({ acceptedBy }: { acceptedBy: NonNullable<BroadcastLeg['acceptedBy']> }): React.ReactElement {
   return (
-    <ContentPrimitives
-      type="utility"
-      text={acceptedBy.name}
-      subtext={acceptedBy.phone}
-      showVisualAnchor
-      showLeadingIcon={false}
-      showAvatar
-      avatarName={acceptedBy.name}
-      showTrailingContent
-      showPassiveElements
-      passiveElements={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
-          <span className="text-label-s-regular" style={{ color: 'var(--text-default-sub-body)', whiteSpace: 'nowrap' }}>
-            {acceptedBy.seconds}s
-          </span>
-          <div style={{ width: 0, height: 20, borderLeft: 'var(--stroke-xs) solid var(--border-neutral-default)' }} />
-        </div>
-      }
-      showInteractiveElements
-      interactiveElements={
-        // Inert — no call-integration flow exists yet (VOIP-gated per the designer's note).
-        <Button variant="secondary" size="medium" iconOnly="Phone" iconOutlined aria-label="Call driver" />
-      }
-    />
+    <ContentCard style={{ padding: 'var(--padding-16px)' }}>
+      <ContentPrimitives
+        type="utility"
+        text={acceptedBy.name}
+        subtext={acceptedBy.phone}
+        showVisualAnchor
+        showLeadingIcon={false}
+        showAvatar
+        avatarName={acceptedBy.name}
+        showTrailingContent
+        showPassiveElements
+        passiveElements={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
+            <span className="text-label-s-regular" style={{ color: 'var(--text-default-label-idle)', whiteSpace: 'nowrap' }}>
+              {acceptedBy.seconds}s
+            </span>
+            <div style={{ width: 0, height: 20, borderLeft: 'var(--stroke-xs) solid var(--border-neutral-default)' }} />
+          </div>
+        }
+        showInteractiveElements
+        interactiveElements={
+          // Inert — no call-integration flow exists yet (VOIP-gated per the designer's note).
+          <Button variant="secondary" size="medium" iconOnly="Phone" iconOutlined aria-label={`Call ${acceptedBy.name}`} />
+        }
+      />
+    </ContentCard>
   );
 }
 
@@ -392,6 +406,7 @@ function TimelineEntry({
   isFirst,
   isLast,
   legIndex,
+  showCallButton,
 }: {
   leg: BroadcastLeg;
   /** Round-marker label for this entry, if it opens a new round group. */
@@ -403,6 +418,8 @@ function TimelineEntry({
   isLast: boolean;
   /** Marks this entry as the scroll target for round-marker navigation. */
   legIndex: number;
+  /** Passed down to the accordion — see `BroadcastModel.driverAssigned`. */
+  showCallButton: boolean;
 }): React.ReactElement {
   const outcomeBadge = OUTCOME_BADGE[leg.outcome];
   // The live leg's badge cycles signal bars — same animation as the Priority Driver
@@ -447,7 +464,13 @@ function TimelineEntry({
             showInteractiveElements={false}
           />
           {leg.acceptedBy && <AcceptedRow acceptedBy={leg.acceptedBy} />}
-          <BroadcastEventAccordion type={leg.accordionType} drivers={leg.drivers} defaultOpen={leg.defaultOpen} />
+          <BroadcastEventAccordion
+            type={leg.accordionType}
+            drivers={leg.drivers}
+            broadcastSeconds={leg.broadcastSeconds}
+            showCallButton={showCallButton}
+            defaultOpen={leg.defaultOpen}
+          />
           {leg.footnote && <NotificationBanner type="neutral" variant="subtle" description={leg.footnote} />}
         </ContentCard>
       </div>
@@ -589,6 +612,9 @@ export function DispatchLogsTab({
                   isFirst={i === 0}
                   isLast={i === model.legs.length - 1}
                   legIndex={i}
+                  // Once the order has a driver, the drivers who passed on it aren't
+                  // worth calling — so their Call buttons (and dividers) go away.
+                  showCallButton={!model.driverAssigned}
                 />
               );
             })}

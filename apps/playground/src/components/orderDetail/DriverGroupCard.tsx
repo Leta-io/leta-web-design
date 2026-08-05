@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Badge, ContentPrimitives, NotificationBanner } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
 import type { DriverGroup } from '../../store/types.js';
-import { prefersReducedMotion, useBroadcastSignalIcon } from './broadcastSignal.js';
+import { ensureSpinnerStyles, prefersReducedMotion, SPINNER_CLASS, useBroadcastSignalIcon } from './broadcastSignal.js';
 
 /**
  * Driver Group Card (Figma `1707:120011`, "Driver Group Cards") — one card per
@@ -27,30 +27,23 @@ import { prefersReducedMotion, useBroadcastSignalIcon } from './broadcastSignal.
  * re-runs the same acceptance window). Copy is phrased condition-first and in
  * active voice ("If no driver accepts within Ns, …") — clearer and friendlier
  * than the old passive "Escalates to … after Ns if the broadcast is unaccepted."
+ *
+ * The next group is named in the **bracket form** — `Suppliers [P2]`, matching the
+ * card titles and the timeline's leg titles. (Ruled 2026-08-05; the banner previously
+ * used the parenthesised prose form. The status card's *sentence* copy in
+ * `broadcastModel.ts` still says "…to In-house drivers (P1) was unaccepted." because
+ * Figma writes that one in prose form — don't unify the two without a ruling.)
  */
 function escalationCopy(group: DriverGroup, ladder: DriverGroup[], fallbackEnabled: boolean): string {
   const next = ladder.find((g) => g.priority === group.priority + 1);
   const seconds = group.acceptanceWindowSeconds * Math.max(1, group.retries);
   if (next) {
-    return `If no driver accepts within ${seconds} seconds, the order escalates to ${next.name} (P${next.priority}).`;
+    return `If no driver accepts within ${seconds} seconds, the order escalates to ${next.name} [P${next.priority}].`;
   }
   // Last group in the ladder: either the fallback sweep or a re-run from P1.
   return fallbackEnabled
     ? `If no driver accepts within ${seconds} seconds, the order is broadcast to all available drivers near the depot.`
     : `If no driver accepts within ${seconds} seconds, the broadcast re-runs from P1.`;
-}
-
-let stylesInjected = false;
-function ensureStyles(): void {
-  if (stylesInjected || typeof document === 'undefined') return;
-  stylesInjected = true;
-  const el = document.createElement('style');
-  el.setAttribute('data-leta', 'driver-group-card');
-  el.textContent = `
-@keyframes leta-driver-group-spin { to { transform: rotate(360deg); } }
-.leta-driver-group-spinner { animation: leta-driver-group-spin 1s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .leta-driver-group-spinner { animation: none; } }`;
-  document.head.appendChild(el);
 }
 
 function MetricRow({ label, value, icon }: { label: string; value: string; icon?: IconName }): React.ReactElement {
@@ -102,7 +95,7 @@ export function DriverGroupCard({
   /** 1-based retry currently running, for the "try N of M" meta. */
   attempt?: number;
 }): React.ReactElement {
-  ensureStyles();
+  ensureSpinnerStyles();
   const meta = {
     number: group.priority,
     title: `${group.name} [P${group.priority}]`,
@@ -190,7 +183,7 @@ export function DriverGroupCard({
           </div>
           {broadcasting && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)', flexShrink: 0 }}>
-              <span className="leta-driver-group-spinner" style={{ display: 'flex', color: 'var(--icons-information-default)' }}>
+              <span className={SPINNER_CLASS} style={{ display: 'flex', color: 'var(--icons-information-default)' }}>
                 <Icon name="Loading" size={16} />
               </span>
               {/* tabular-nums: the elapsed/found counts tick live — fixed-width digits
@@ -211,7 +204,10 @@ export function DriverGroupCard({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)', padding: 'var(--padding-20px)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)' }}>
           <MetricRow label="Acceptance window" value={meta.acceptanceWindow} icon="Timer" />
-          <MetricRow label="Retries" value={String(meta.retries)} icon="Redo" />
+          {/* `Refresh` per Figma (`Icon/Refresh`) — the retry glyph, not `Redo`. It has no
+              outline sibling in the registry, so it renders filled exactly as Figma shows,
+              unlike its three `-Outline` neighbours below. */}
+          <MetricRow label="Retries" value={String(meta.retries)} icon="Refresh" />
           <MetricRow label="Max orders" value={String(meta.maxOrders)} icon="Orders" />
           <MetricRow label="Total drivers" value={String(meta.totalDrivers)} icon="Account" />
         </div>
