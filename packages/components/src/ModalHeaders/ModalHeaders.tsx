@@ -74,6 +74,37 @@ export interface ModalHeadersProps
  *   so `showSecondaryContent` defaults to `true`.
  * - `tabs` — the **Page Tabs Control** SLOT (`with-tabs` variant only).
  */
+/**
+ * The back arrow is a bare icon in Figma (no button chrome), but must stay
+ * keyboard-operable — so it ships as a `<button>` reset down to the glyph's own
+ * box: no background, no border, no padding, and the standard project focus ring.
+ */
+let navArrowStylesInjected = false;
+function ensureNavArrowStyles(): void {
+  if (navArrowStylesInjected || typeof document === 'undefined') return;
+  navArrowStylesInjected = true;
+  const el = document.createElement('style');
+  el.setAttribute('data-leta', 'modal-nav-arrow');
+  el.textContent = `
+.leta-modal-nav-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--icons-neutral-default);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.leta-modal-nav-arrow:focus { outline: none; }
+.leta-modal-nav-arrow:focus-visible {
+  outline: var(--stroke-sm) solid var(--border-secondary-component-focus);
+  outline-offset: 4px;
+}`;
+  document.head.appendChild(el);
+}
+
 export const ModalHeaders = React.forwardRef<HTMLDivElement, ModalHeadersProps>(
   function ModalHeaders(
     {
@@ -97,6 +128,7 @@ export const ModalHeaders = React.forwardRef<HTMLDivElement, ModalHeadersProps>(
     ref,
   ) {
     const hasTabs = variant === 'with-tabs';
+    if (showNavArrow) ensureNavArrowStyles();
 
     return (
       <div
@@ -146,15 +178,27 @@ export const ModalHeaders = React.forwardRef<HTMLDivElement, ModalHeadersProps>(
               {showBreadcrumb && breadcrumb}
               {/* Title row: optional arrow + optional leading icon + Title */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-8px)' }}>
+                {/*
+                  Back arrow. In Figma this is a **bare `Arrow-Left` icon**, not a
+                  button — it carries no 40×40 ghost chrome, no hover fill and no
+                  padding (it was wrongly built as a Ghost / Prominent Icon-Only
+                  Button, which inflated the title row and painted a hover square).
+
+                  It is still rendered as a real `<button>`, because back
+                  navigation must be keyboard-reachable and announced — but the
+                  button is stripped to the glyph's own box so it is visually
+                  identical to the icon in the design. Focus is the standard
+                  project ring (`:focus-visible`), inherited from the reset.
+                */}
                 {showNavArrow && (
-                  <Button
-                    variant="ghost"
-                    size="medium"
-                    prominent
-                    iconOnly="Arrow-Left"
+                  <button
+                    type="button"
                     onClick={onNavBack}
                     aria-label="Go back"
-                  />
+                    className="leta-modal-nav-arrow"
+                  >
+                    <Icon name="Arrow-Left" size="xl" aria-hidden />
+                  </button>
                 )}
                 {showLeadingIcon && leadingIcon && (
                   <Icon name={leadingIcon} size="xl" color={leadingIconColor} aria-hidden />

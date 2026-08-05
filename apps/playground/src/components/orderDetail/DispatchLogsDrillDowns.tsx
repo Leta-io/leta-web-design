@@ -6,6 +6,7 @@ import {
   Chip,
   ContentPrimitives,
   NotificationBanner,
+  EmptyState,
   SearchInput,
   Table,
   TableDataControl,
@@ -53,6 +54,24 @@ const BODY: React.CSSProperties = {
  * never to implement a hidden node. So both slots are overridden with the bare
  * content, rather than taking the variant's defaults.
  */
+/**
+ * No-search-results state for a nested drawer.
+ *
+ * **Uses the illustrated (with-icon) `no-results` EmptyState.** The rule (ruled
+ * 2026-08-05): every search surface with real real-estate — drawers, pages, large
+ * modals — gets the illustrated variant. The `showIcon={false}` text-only variant
+ * is reserved for *small* surfaces: compact overlays, dropdown menus, inline field
+ * pickers. These drill-downs are full-height 768px drawer panels, so they take the
+ * illustrated one.
+ */
+function DrillEmpty({ noun }: { noun: string }): React.ReactElement {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 'var(--padding-40px)', width: '100%' }}>
+      <EmptyState type="no-results" size="desktop" description={`Try adjusting your search to find ${noun}.`} />
+    </div>
+  );
+}
+
 function DrillToolbar({
   count,
   leading,
@@ -74,7 +93,8 @@ function DrillToolbar({
           value={query}
           onChange={(e) => onQuery(e.currentTarget.value)}
           onClear={() => onQuery('')}
-          style={{ width: 240 }}
+          // 250px per the nested-drawer wireframes (was 240).
+          style={{ width: 250 }}
         />
       }
       columnControl={
@@ -187,7 +207,11 @@ function BatchedOrdersScreen({ model, depotName, order }: { model: BroadcastMode
       {/* `complex` (80px) rows — same density as the main Orders table; the
           address cell needs the two-line height, and a shorter `basic` row was
           the reported height mismatch. */}
-      <Table columns={BATCH_COLUMNS} rows={filtered} selectable={false} scrollX="auto" rowVariant="complex" />
+      {filtered.length === 0 ? (
+        <DrillEmpty noun="orders" />
+      ) : (
+        <Table columns={BATCH_COLUMNS} rows={filtered} selectable={false} scrollX="auto" rowVariant="complex" />
+      )}
     </div>
   );
 }
@@ -220,6 +244,7 @@ function PriorityGroupsScreen({ model }: { model: BroadcastModel }): React.React
           }
         />
       )}
+      {filtered.length === 0 && <DrillEmpty noun="driver groups" />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)', width: '100%' }}>
         {filtered.map((g) => {
           // Which group is live comes from the shared broadcast clock, not from
@@ -285,6 +310,7 @@ function NotifiedDriversScreen({ model }: { model: BroadcastModel }): React.Reac
           ))}
         </div>
       )}
+      {filtered.length === 0 && <DrillEmpty noun="drivers" />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-16px)', width: '100%' }}>
         {filtered.map((d, i) => (
           <React.Fragment key={d.id}>
