@@ -51,7 +51,10 @@ const NAV_GROUPS: { label?: string; items: NavEntry[] }[] = [
     label: 'Management',
     items: [
       { label: 'Depots', icon: 'Depot', path: '/depots' },
-      { label: 'Settings', icon: 'Settings', path: '/settings' },
+      // "Admin", not "Settings" (renamed 2026-08-05, matching the Figma wireframes) —
+      // the module holds tenant administration, not just preferences. The route keeps
+      // its `/settings` path for now so existing links don't break.
+      { label: 'Admin', icon: 'Settings', path: '/settings' },
       { label: 'Integrations', icon: 'Integration', path: '/integrations' },
     ],
   },

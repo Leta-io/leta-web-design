@@ -163,36 +163,101 @@ export interface ProductOption {
 }
 
 /**
+ * The five stage SLAs (Doc 4 §5), in **minutes**. Authored once by the client in
+ * Admin → Service Levels; every depot inherits them unless it overrides
+ * (`depot.sla.override`, Doc 2 §10).
+ */
+export interface SlaConfig {
+  /** SLA 1 · Assignment — Ready for delivery → Assigned to driver. */
+  assignment: number;
+  /** SLA 2 · Travel to depot — Assigned → Arrived at depot. */
+  arriveAtDepot: number;
+  /** SLA 3 · Pickup — Arrived at depot → Pickup completed. */
+  pickup: number;
+  /** SLA 4 · Travel to destination — Delivery started → Arrived at destination. */
+  arriveAtDestination: number;
+  /** SLA 5 · Completion — Arrived at destination → Delivered / Cancelled / Return triggered. */
+  completeAtDestination: number;
+}
+
+/** The five Phase-1 / Phase-2 stages in order, with the copy the Admin page uses. */
+export const SLA_STAGES: { key: keyof SlaConfig; phase: 1 | 2; label: string; span: string }[] = [
+  { key: 'assignment', phase: 1, label: 'Assignment', span: 'Ready for delivery → Assigned to driver' },
+  { key: 'arriveAtDepot', phase: 1, label: 'Travel to depot', span: 'Assigned → Arrived at depot' },
+  { key: 'pickup', phase: 1, label: 'Pickup', span: 'Arrived at depot → Pickup completed' },
+  { key: 'arriveAtDestination', phase: 2, label: 'Travel to destination', span: 'Delivery started → Arrived at destination' },
+  { key: 'completeAtDestination', phase: 2, label: 'Completion', span: 'Arrived at destination → Delivered' },
+];
+
+/**
+ * **Expected Order Fulfilment Time** = the sum of the five stage SLAs (Doc 4 §1)
+ * — the constant denominator of every order's fulfilment counter. Derived, never
+ * entered: it is the read-only row in Admin → Service Levels.
+ */
+export function expectedOftMinutes(sla: SlaConfig): number {
+  return sla.assignment + sla.arriveAtDepot + sla.pickup + sla.arriveAtDestination + sla.completeAtDestination;
+}
+
+/**
  * Per-client configuration — the platform manifests differently per company based
- * on the modules it uses and the depots/roles a user has access to. Until the
- * Configuration spec + wireframes exist, this is a hand-authored profile per client
- * that config-driven UI (starting with the Add Order drawer) reads. Switching the
- * active client (breadcrumb chip) swaps this profile.
+ * on the modules it uses and the depots/roles a user has access to. Authored in
+ * the **Admin** module (the client tier of Doc 2 §11: capability enablement plus
+ * platform-wide defaults). Switching the active client (breadcrumb chip) swaps
+ * this profile.
+ *
+ * Everything here is client-scoped. Operational, per-location behaviour — the
+ * broadcast ladder, order wait time, geofences, and depot overrides of the SLA /
+ * POD / pickup-confirmation defaults below — belongs to the depot record.
  */
 export interface ClientConfig {
   /** Depots this user can pick from. 1 → locked field; 2+ → searchable select. */
   depots: DepotOption[];
-  /** Items module. `manual` → free-text item name; `product` → select from `products`. */
+  /** Items module. `manual` → free-text item name; `product` → select from the catalogue. */
   items: { enabled: boolean; mode: 'manual' | 'product'; valueRequired: boolean };
-  /** Product catalogue (product-mode only). */
-  products: ProductOption[];
+  /**
+   * Product management (`products.enabled`, Doc 2 §2) — whether the tenant keeps a
+   * catalogue. Prerequisite for `items.mode: 'product'`: there is nothing to select
+   * from without one, so turning this off falls the item mode back to `manual`.
+   */
+  products: { enabled: boolean; catalogue: ProductOption[] };
   /** Payment module — the Add Order "Payment Info" section. */
   payment: { enabled: boolean };
+  /** The five stage SLAs every depot inherits (Doc 4 §5). */
+  sla: SlaConfig;
   /**
    * Auto-broadcast (`scheduling.autoBroadcast.enabled`, OM §2.3): Scheduled
    * orders transition straight to Broadcasted at T−1h; non-scheduled orders sit
    * in Pending for {@link orderWaitMinutes} before auto-broadcasting (§7.2 row 2b).
    */
   autoBroadcast: boolean;
-  /** Order wait time (`dispatch.orderWaitTime`, minutes) — how long a
-   *  non-scheduled order stays Pending before auto-broadcast. */
+  /** Order wait time (`broadcast.orderWaitTime`, minutes) — how long a
+   *  non-scheduled order stays Pending before auto-broadcast. **Depot-scoped**
+   *  in Doc 5 §4; held here until the Depots module lands. */
   orderWaitMinutes: number;
+  /** En-route pickup (`dispatch.enRoutePickup.enabled`) — extends Add to Trip to
+   *  drivers already on the road (OM §10.3). */
+  enRoutePickup: boolean;
   /** Pickup confirmation (`pickup.confirmation.enabled`): the Pickup Code card +
-   *  Proof of Pickup elements in the Order Detail view (OM §7.3). */
+   *  Proof of Pickup elements in the Order Detail view (OM §7.3). Client default;
+   *  a depot may override (`depot.pickupConfirmation.override`). */
   pickupConfirmation: boolean;
-  /** Proof of delivery (`delivery.pod.*`): recipient signature / POD photo in the
-   *  Delivered detail view (OM §7.3). */
-  proofOfDelivery: boolean;
+  /**
+   * Proof of delivery (`delivery.pod.signature.enabled` / `delivery.pod.photo.enabled`,
+   * Doc 2 §3) — two **independent** requirements, so a client may ask for either,
+   * both, or neither. Client default; a depot may override (`depot.pod.override`).
+   */
+  pod: { signature: boolean; photo: boolean };
+  /** Returns (Doc 2 §5). `management` gates Dispatch + Reschedule on Returned
+   *  orders — never Edit. `compensation` decides only *whether* return trips are
+   *  paid; the model lives per rate card in Driver Earnings. */
+  returns: { driverInitiated: boolean; management: boolean; compensation: boolean };
+  /**
+   * Driver broadcast **suspension** (Doc 5 §3) — never "deactivation": the account
+   * stays active, only broadcast eligibility pauses. A driver completing fewer than
+   * `minOrders` in the past `withinDays` is suspended from broadcasts. One threshold
+   * tenant-wide (the per-driver-group override was withdrawn 2026-08-05).
+   */
+  suspension: { enabled: boolean; minOrders: number; withinDays: number; autoReinstate: boolean };
 }
 
 /**

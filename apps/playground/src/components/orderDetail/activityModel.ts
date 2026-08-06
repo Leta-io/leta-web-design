@@ -385,7 +385,7 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
 
     if (to === 'delivered') {
       const blocks: ActivityBodyBlock[] = [{ kind: 'status', icon: 'Order-Status', lead: 'Order status changed from', from, to }];
-      if (config.proofOfDelivery) {
+      if (config.pod.signature || config.pod.photo) {
         blocks.push({
           kind: 'attachments',
           items: proofFiles.map((f) => ({ kind: 'link' as const, thumbnailSrc: f.src, label: `View ${f.label}` })),

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Client, Driver, Order, OrderStatus, ToastItem } from './types.js';
+import type { Client, ClientConfig, Driver, Order, OrderStatus, ToastItem } from './types.js';
 import { DEFAULT_CLIENT, MOCK_CLIENTS, MOCK_DRIVERS, MOCK_ORDERS } from './mockData.js';
 
 /**
@@ -43,6 +43,20 @@ interface StoreState {
 
   /** Switch the active client tenant (future Top Bar client switcher). */
   setClient: (id: string) => void;
+  /**
+   * Patch the active client's configuration (the Admin module, Doc 2). Writes
+   * through to the entry in `clients` as well, so a setting survives switching
+   * accounts and back — and so every config-driven surface (Add Order drawer,
+   * Order Detail, dispatch behaviour) picks the change up immediately.
+   *
+   * Pass an **updater** whenever the patch derives from the current config
+   * (e.g. flipping one key of a nested object). A plain object built from a
+   * render-time snapshot would clobber any sibling change made in the same
+   * tick, since that snapshot is one render behind.
+   */
+  updateClientConfig: (
+    patch: Partial<ClientConfig> | ((config: ClientConfig) => Partial<ClientConfig>),
+  ) => void;
 
   // --- mutations ---
   addOrder: (input: NewOrderInput) => Order;
@@ -80,6 +94,17 @@ export const useStore = create<StoreState>((set, get) => ({
   setClient: (id) => {
     const next = get().clients.find((c) => c.id === id);
     if (next) set({ client: next });
+  },
+
+  updateClientConfig: (patch) => {
+    set((s) => {
+      const resolved = typeof patch === 'function' ? patch(s.client.config) : patch;
+      const next: Client = { ...s.client, config: { ...s.client.config, ...resolved } };
+      return {
+        client: next,
+        clients: s.clients.map((c) => (c.id === next.id ? next : c)),
+      };
+    });
   },
 
   addOrder: (input) => {

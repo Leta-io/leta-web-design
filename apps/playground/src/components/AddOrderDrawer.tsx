@@ -372,7 +372,8 @@ export function AddOrderDrawer({ open, config, onClose, onSubmit, mode = 'create
       // has no structured item list). Product mode → match by name, else 1st product.
       if (config.items.enabled) {
         if (config.items.mode === 'product') {
-          const p = config.products.find((x) => x.name === editOrder.package) ?? config.products[0];
+          const p =
+            config.products.catalogue.find((x) => x.name === editOrder.package) ?? config.products.catalogue[0];
           setItems(p ? [{ key: ++itemSeq.current, name: '', productId: p.id, qty: editOrder.items || 1 }] : []);
         } else {
           setItems([{ key: ++itemSeq.current, name: editOrder.package, productId: '', qty: editOrder.items || 1 }]);
@@ -436,7 +437,7 @@ export function AddOrderDrawer({ open, config, onClose, onSubmit, mode = 'create
   if (!open) return null;
 
   // derived
-  const products = config.products;
+  const products = config.products.catalogue;
   const productMode = config.items.mode === 'product';
   const derivedItemsValue = items.reduce((sum, r) => {
     const p = products.find((x) => x.id === r.productId);

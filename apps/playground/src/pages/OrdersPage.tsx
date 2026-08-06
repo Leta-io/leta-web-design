@@ -945,9 +945,18 @@ export function OrdersPage(): React.ReactElement {
   };
 
   // Edit Order (OM §8, Figma 350:38360) — reuses the Add Order drawer in edit
-  // mode, prefilled. Editable only for Ready/at-depot statuses; In Transit and
-  // beyond are frozen (the recourse is a disruption action, not an edit).
-  const EDITABLE_STATUSES: OrderStatus[] = ['scheduled', 'pending', 'broadcasted', 'assigned', 'at-depot'];
+  // mode, prefilled. Editable for the Ready states (order still at//before the
+  // depot); In Transit and beyond are frozen — the recourse there is a disruption
+  // action, not an edit.
+  //
+  // **`returned` is editable and that is load-bearing** (OM §2.3, §8, §12.7): a
+  // returned order is a holding bay, not a terminal, and most redelivery failures
+  // are bad-data failures (wrong address, unreachable recipient). Fixing the cause
+  // before retrying is the entire point of the bay — the spec says in as many words
+  // "do not treat Returned as read-only". It was missing here, which blocked the
+  // action with a "left the depot" toast that was doubly wrong: a returned order has
+  // come *back*. (Fixed 2026-08-05.)
+  const EDITABLE_STATUSES: OrderStatus[] = ['scheduled', 'pending', 'broadcasted', 'assigned', 'at-depot', 'returned'];
   const [editOrderId, setEditOrderId] = React.useState<string | null>(null);
   // Distinguishes "edited from inside the open View drawer" (its footer → Edit
   // Order) from "edited via the table row's overflow menu" (View drawer never

@@ -88,20 +88,28 @@ export const MOCK_CLIENTS: Client[] = [
         { id: 'dep-kil', name: 'Kilimani Dispatch Hub', address: '5 Argwings Kodhek Rd, Kilimani' },
       ],
       items: { enabled: true, mode: 'product', valueRequired: true },
-      products: [
-        { id: 'p-water', name: 'Bottled Water (500ml)', price: 60 },
-        { id: 'p-bread', name: 'Bread Loaf', price: 75 },
-        { id: 'p-rice', name: 'Rice 2kg', price: 320 },
-        { id: 'p-milk', name: 'Milk 1L', price: 70 },
-        { id: 'p-sugar', name: 'Sugar 1kg', price: 180 },
-      ],
+      products: {
+        enabled: true,
+        catalogue: [
+          { id: 'p-water', name: 'Bottled Water (500ml)', price: 60 },
+          { id: 'p-bread', name: 'Bread Loaf', price: 75 },
+          { id: 'p-rice', name: 'Rice 2kg', price: 320 },
+          { id: 'p-milk', name: 'Milk 1L', price: 70 },
+          { id: 'p-sugar', name: 'Sugar 1kg', price: 180 },
+        ],
+      },
       payment: { enabled: true },
+      // Doc 4's reference durations (5 + 10 + 5 + 15 + 5) → 40 min expected OFT.
+      sla: { assignment: 5, arriveAtDepot: 10, pickup: 5, arriveAtDestination: 15, completeAtDestination: 5 },
       // Auto-broadcast ON (order wait time 2 min) + full proof requirements —
       // exercises the §7.2 row-2b Pending countdown, Pickup Code + POP + POD.
       autoBroadcast: true,
       orderWaitMinutes: 2,
+      enRoutePickup: true,
       pickupConfirmation: true,
-      proofOfDelivery: true,
+      pod: { signature: true, photo: true },
+      returns: { driverInitiated: true, management: true, compensation: true },
+      suspension: { enabled: true, minOrders: 5, withinDays: 30, autoReinstate: true },
     },
   },
   {
@@ -113,14 +121,22 @@ export const MOCK_CLIENTS: Client[] = [
         { id: 'dep-parklands', name: 'Parklands Collection Center', address: '6 Parklands Ave, Parklands, Nairobi' },
       ],
       items: { enabled: true, mode: 'manual', valueRequired: true },
-      products: [],
+      // Manual items, so no catalogue to keep — product management off.
+      products: { enabled: false, catalogue: [] },
       payment: { enabled: true },
+      // A tighter promise than Acme's: 30 min expected OFT.
+      sla: { assignment: 5, arriveAtDepot: 8, pickup: 4, arriveAtDestination: 10, completeAtDestination: 3 },
       // Manual dispatch (no auto-broadcast) — Pending shows "Dispatch Now"
       // (§7.2 row 3); no pickup confirmation → no Pickup Code / POP.
       autoBroadcast: false,
       orderWaitMinutes: 0,
+      enRoutePickup: false,
       pickupConfirmation: false,
-      proofOfDelivery: true,
+      // Photo only — the independent-POD case (Doc 2 §3).
+      pod: { signature: false, photo: true },
+      // Returns handled outside the platform: no re-dispatch of a returned order.
+      returns: { driverInitiated: false, management: false, compensation: false },
+      suspension: { enabled: false, minOrders: 5, withinDays: 30, autoReinstate: false },
     },
   },
   {
@@ -139,13 +155,17 @@ export const MOCK_CLIENTS: Client[] = [
         },
       ],
       items: { enabled: false, mode: 'manual', valueRequired: false },
-      products: [],
+      products: { enabled: false, catalogue: [] },
       payment: { enabled: false },
+      sla: { assignment: 5, arriveAtDepot: 10, pickup: 5, arriveAtDestination: 20, completeAtDestination: 5 },
       // Auto-broadcast ON so the marketplace Dispatch Logs shape is actually reachable.
       autoBroadcast: true,
       orderWaitMinutes: 3,
+      enRoutePickup: false,
       pickupConfirmation: true,
-      proofOfDelivery: false,
+      pod: { signature: false, photo: false },
+      returns: { driverInitiated: true, management: true, compensation: false },
+      suspension: { enabled: true, minOrders: 3, withinDays: 14, autoReinstate: false },
     },
   },
 ];

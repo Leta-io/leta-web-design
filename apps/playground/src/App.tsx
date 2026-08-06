@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './shell/AppShell.js';
 import { ComingSoonPage } from './pages/ComingSoonPage.js';
+import { AdminPage } from './pages/admin/AdminPage.js';
 
 // Route-level code splitting: MapPage pulls in Leaflet (a large dependency
 // only needed on /map), and OrdersPage pulls in the heaviest DesktopDropdowns/
@@ -45,7 +46,8 @@ export function App(): React.ReactElement {
         <Route path="/fleet" element={<ComingSoonPage />} />
         <Route path="/team" element={<ComingSoonPage />} />
         <Route path="/depots" element={<ComingSoonPage />} />
-        <Route path="/settings" element={<ComingSoonPage />} />
+        {/* Admin (sidebar "Admin") — the client-configuration module. */}
+        <Route path="/settings" element={<AdminPage />} />
         <Route path="/integrations" element={<ComingSoonPage />} />
         <Route path="*" element={<Navigate to="/orders" replace />} />
       </Route>

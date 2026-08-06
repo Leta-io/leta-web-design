@@ -223,7 +223,19 @@ const BasicField = React.forwardRef<HTMLTextAreaElement, {
   const {
     rows = 4, placeholder = 'Some descriptive text here would be very nice to see', disabled = false,
     maxLength, value, defaultValue, onChange, showCounter = true,
-    onFocus, onBlur, ...textareaProps
+    onFocus, onBlur,
+    // Chrome props belong to the wrapper (label row, message row, root box), NOT
+    // to the <textarea>. They must be destructured away even though nothing here
+    // reads them: whatever is left lands on the DOM node via `...textareaProps`,
+    // where React warns about each unknown attribute ("React does not recognize
+    // the `showHelper` prop on a DOM element"). `className`/`style` are excluded
+    // for a second reason — they are already applied to the root by `TextArea`,
+    // and spreading them here would overwrite the textarea's own class (dropping
+    // the `text-label-m-regular` font) and inline styles.
+    variant: _variant, label: _label, showLabel: _showLabel, showLabelIcon: _showLabelIcon,
+    labelIcon: _labelIcon, tag: _tag, labelToggle: _labelToggle, helperText: _helperText,
+    showHelper: _showHelper, error: _error, warning: _warning, className: _className, style: _style,
+    ...textareaProps
   } = props;
 
   const [count, setCount] = React.useState(String(value ?? defaultValue ?? '').length);

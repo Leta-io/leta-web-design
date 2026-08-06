@@ -615,14 +615,16 @@ export function buildBroadcastModel(
       // so the two tabs start from an identical base (OM Appendix A).
       holdMinutesBase = (h % Math.max(client.config.orderWaitMinutes, 2)) + 1;
       title = `Broadcast starts in ${holdMinutesBase} minute${holdMinutesBase === 1 ? '' : 's'}`;
-      subtext = 'When the hold window closes, the broadcast will run through all priority groups.';
+      // "Order wait time", never "hold window" — the admin-facing name for this
+      // setting, and what admins already call it (ruled 2026-08-05, Figma updated).
+      subtext = 'When the order wait time expires, the broadcast will run through all priority groups.';
       banner = { kind: 'assign-driver', text: 'Assign a driver to this order before broadcast begins.' };
       // SAAS / managed-fleet gets the auto-broadcast-specific copy (updated in
       // Figma 526:52830, 2026-08-04); marketplace tenants have no broadcast
       // sequence, so they get the generic placeholder.
       emptyDescription = marketplace
         ? 'All broadcast logs will be displayed here'
-        : 'Dispatch manually now to bypass auto-broadcast. Once the hold window closes, drivers will receive order broadcasts.';
+        : 'Dispatch manually now to bypass auto-broadcast. Once the order wait time expires, drivers will receive order broadcasts.';
       break;
     }
     case 'broadcasting':

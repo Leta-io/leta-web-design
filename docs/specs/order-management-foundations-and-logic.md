@@ -8,7 +8,7 @@
 > **Companion design spec:** Table Column Layout Specification (owns column widths, floors, truncation, responsive behaviour)
 > **Audience:** implementation agent + engineers
 > **Status:** Ready for build — domain logic (Parts 1–11) and orders-surface interaction (Part 12); generic component behaviour in Doc 3
-> **Version:** 3.3 — clarifies that the Overview row-2b countdown (§7.2) and the Dispatch Logs tab's On Hold countdown (§7.5.2) are **one `dispatch.orderWaitTime` hold window**, not two independent timers — both tabs must show the identical remaining time regardless of which is open (ruled 2026-08-04; Appendix A flag description updated). (3.2 — adds the **broadcast sequence model** (§7.5.1: typical rounds through per-depot priority driver groups, round-1-only pre-offer, optional fallback round, re-broadcast restarting the sequence with no demarcation), the **seven Dispatch Logs content states** and round-marker scroll navigation (§7.5.2), the **marketplace collapse to a single flat log** (§7.5.3), the **three drill-downs** (§7.5.4), and four depot-scoped `dispatch.broadcast.*` flags (Appendix A). (3.1 — clarifies that **fleet / company type (`dispatch.fleetType`) is platform-provisioned** (set by LETA internal admin from the master account, read-only to the tenant), not a tenant-admin toggle; adds the LETA internal admin actor + the two-configuration-tier distinction (§2.2), and threads it through §7.5 / §9 / Appendix A.) (3.0 — adds §7.2.1 Route line styling and the expanded-map chrome components/banner matrix, reconciled against wireframes `1522:115768` on 2026-07-27.)
+> **Version:** 3.4 — configuration session (2026-08-05): **§10.7 capacity ceiling** (`depot.maxOrdersPerTrip`, depot-scoped, enforced on dispatch selection / Change Driver / Add to Trip); **`returns.management.enabled`** gating Dispatch + Reschedule on Returned orders while never gating Edit; **smart dispatch gates the Dispatch Logs tab**; **order wait time** adopted as the single name for the pre-broadcast wait ("hold window" retired); pickup confirmation and the broadcast dials confirmed **depot**-scoped, SLA defaults **client**-scoped with depot override. (3.3 — clarifies that the Overview row-2b countdown (§7.2) and the Dispatch Logs tab's On Hold countdown (§7.5.2) are **one `broadcast.orderWaitTime` order wait time**, not two independent timers — both tabs must show the identical remaining time regardless of which is open (ruled 2026-08-04; Appendix A flag description updated). (3.2 — adds the **broadcast sequence model** (§7.5.1: typical rounds through per-depot priority driver groups, round-1-only pre-offer, optional fallback round, re-broadcast restarting the sequence with no demarcation), the **seven Dispatch Logs content states** and round-marker scroll navigation (§7.5.2), the **marketplace collapse to a single flat log** (§7.5.3), the **three drill-downs** (§7.5.4), and four depot-scoped `dispatch.broadcast.*` flags (Appendix A). (3.1 — clarifies that **fleet / company type (`dispatch.fleetType`) is platform-provisioned** (set by LETA internal admin from the master account, read-only to the tenant), not a tenant-admin toggle; adds the LETA internal admin actor + the two-configuration-tier distinction (§2.2), and threads it through §7.5 / §9 / Appendix A.) (3.0 — adds §7.2.1 Route line styling and the expanded-map chrome components/banner matrix, reconciled against wireframes `1522:115768` on 2026-07-27.)
 
 ---
 
@@ -267,7 +267,7 @@ The region above the accordion sections: a mini-map (left) and the **summary car
 | 12 | Cancelled | Order cancelled | Cancelled at 12:50 PM | View Activity | Static |
 
 - **A Pending order never carries a scheduled date (corrected 2026-07-20).** On an auto-broadcast client, a **Scheduled** order transitions **straight to Broadcasted** at T−1h — it never passes through Pending (§2.3). What puts a *non-scheduled* order on an auto-broadcast client into Pending is the **order wait time** — a configured hold defining how long an order stays Pending before it is auto-broadcast (flag in Appendix A / Doc 2). Row 2b is that countdown. The previous note ("Row 2 applies to any pre-broadcast order on an auto-broadcast client — Scheduled, or an immediate-creation Pending order whose delivery time is still >1h out") is withdrawn: the Pending-with-a-scheduled-date state it described does not exist.
-- **One countdown, two tabs (clarified 2026-08-04).** The Overview row-2b countdown and the Dispatch Logs tab's On Hold state (§7.5.2) are **the same hold window**, not two independent timers — both derive from `dispatch.orderWaitTime` and must show the identical remaining time regardless of which tab is open or how recently the drawer was opened. A per-tab-mount countdown (each tab starting its own timer the moment it's rendered) is the wrong implementation: switching tabs mid-count would show two different numbers. The countdown must be computed once per drawer-open (an absolute base + elapsed-since-open), and both tabs read that single live value.
+- **One countdown, two tabs (clarified 2026-08-04).** The Overview row-2b countdown and the Dispatch Logs tab's On Hold state (§7.5.2) are **the same order wait time**, not two independent timers — both derive from `broadcast.orderWaitTime` (Doc 5 §4; depot-scoped, seconds) and must show the identical remaining time regardless of which tab is open or how recently the drawer was opened. A per-tab-mount countdown (each tab starting its own timer the moment it's rendered) is the wrong implementation: switching tabs mid-count would show two different numbers. The countdown must be computed once per drawer-open (an absolute base + elapsed-since-open), and both tabs read that single live value.
 - **Auto-broadcast assignment banner:** on first entry to Assigned via auto-broadcast, a **dismissible highlight notification banner** shows above the map: "This order was automatically assigned to {Driver Name}."
 - Delivered main copy is **"Order delivered"** (locked) — earlier mockups showing "Order is delivered" are superseded.
 - **Header status icons mirror the table's Order-ID cell icons** (same glyphs, same tooltips — §3.2): provenance (Manual-Touch "Created manually" / Integration "Auto-create via online store" · "From connected app"), Calendar with "Scheduled: {date/time}" for scheduled-origin orders, Broadcast where applicable. They render beside the status badge in the drawer header's Status Badges row.
@@ -380,7 +380,7 @@ Each individual broadcast within a round (the pre-offer lead, one priority group
 
 | State | Shape |
 |---|---|
-| **On Hold** | Hold window still open, nothing broadcast. Title "Broadcast starts in {N} minute(s)" — **the same `dispatch.orderWaitTime` countdown as the Overview tab's row 2b** (§7.2), not an independent timer; both tabs always agree on {N} and count down together. Neutral banner "Assign a driver to this order before broadcast begins." + Dispatch; zeroed summary; empty logs. |
+| **On Hold** | Order wait time still running, nothing broadcast. Title "Broadcast starts in {N} minute(s)" — **the same `broadcast.orderWaitTime` countdown as the Overview tab's row 2b** (§7.2), not an independent timer; both tabs always agree on {N} and count down together. Neutral banner "Assign a driver to this order before broadcast begins." + Dispatch; zeroed summary; empty logs. |
 | **Broadcasting** | A leg is live. Title names the current group/pre-offer, badged `Round N of M`; animating progress bar. |
 | **Completed** | A driver accepted. Title "Broadcast Resolved at {group}"; the accepting driver renders **above** that leg's non-responder accordion. |
 | **Fallback** | All groups passed; broadcasting to every nearby driver. Badged `Fallback Round`; adds the subtle notice "If no driver accepts the fallback broadcast, you can re-broadcast the order(s) manually." |
@@ -502,6 +502,32 @@ In-motion rescue (intercepting a stuck driver's order mid-route) is **out of sco
 - Trip ID persists across Change Driver / Add to Trip / Reassign Trip.
 - A dispatcher can reassign a single order in **under 60 seconds** including reason-code capture (baseline 2m 21s).
 - Reason codes are visible in the order Activity timeline and the trip activity log.
+- **No assignment action may exceed the depot's orders-per-trip ceiling** (§10.7).
+
+### 10.7 Capacity ceiling — maximum orders per trip (added 2026-08-05)
+
+Each depot declares the **maximum number of orders one driver may carry per trip**
+(`depot.maxOrdersPerTrip`, set at depot creation — Doc 2 §10.1). Capacity is a property of the
+depot's vehicle mix and order profile: a bike depot moving hot food and a van depot moving pallets
+have genuinely different ceilings.
+
+**It is enforced, not advisory.** Three surfaces respect it:
+
+| Surface | Constraint |
+|---|---|
+| **Dispatch selection** (§12.9 bulk actions) | A dispatcher cannot select more orders than the ceiling for dispatch to a single driver |
+| **Change Driver** (§10.2) | A driver already carrying the ceiling is not an eligible target |
+| **Add to Trip** (§10.3) | A trip already at the ceiling is not an eligible target — it drops out of the target list on capacity grounds, independently of the in-transit/en-route-pickup rule |
+
+- The ceiling is read from the **order's own depot**. A multi-depot selection is bounded by each
+  order's depot, not by a single global number.
+- **Blocked, with a reason.** Exceeding the ceiling is not a silent truncation: the affordance is
+  disabled/absent and the dispatcher is told the driver or trip is at capacity — a selection that
+  silently drops orders is worse than one that refuses.
+
+> **Distinct from a driver group's "max orders"** (Doc 5 §2), which caps how many orders are
+> *offered* to a group concurrently during a broadcast. This caps how many a driver can
+> *physically carry* on one trip. A depot can broadcast widely and still carry three per trip.
 
 ---
 
@@ -564,9 +590,11 @@ Both use the same four offsets; only the base differs.
 - **Returning** status: the In Transit badge with a reverse-icon overlay, distinguishable at a glance.
 - **Returned is classified Unassigned** (§2.3) — not a true terminal. A returned order is functionally a fresh order awaiting redispatch, carrying the history of its failed attempt. Its detail view and table row use the Unassigned shape (§3.2, §3.4): no Driver, Trip, Duration, or Batch ID columns; SLA and driver/trip fields reset.
 - **Returned order detail view — full action set** (§10.1, §12.5): **Dispatch** (assign a fresh driver) · **Add to Trip** (§10.3) · **Edit Order** · **Reschedule** (→ Scheduled, for a later re-attempt) · **Cancel** (terminal, with reason-code capture) · overflow (Add Comment). **Update Status is excluded** on Returned (Ruled 2026-07-20, §10.1 / §12.6): Mark as Delivered/Pending are both invalid for a returned order. Editing before redispatch is deliberate and load-bearing: most redelivery failures are bad-data failures (wrong address, unreachable recipient), and fixing the cause before retrying is the entire point of the holding bay.
+- **Managing returned orders is configurable** (`returns.management.enabled`, Doc 2 §5 — added 2026-08-05). Not every client re-dispatches a failed delivery; some close the attempt and recover it outside the platform. With the flag **off**, **Dispatch** and **Reschedule** are removed from the Returned action set (table Actions cell, detail footer, and bulk actions alike), leaving view · **edit** · comment · cancel.
+  - **Edit Order is never gated by this flag.** It stays available in both configurations — correcting a bad address has value even for a client that won't retry in-platform, and §2.3's "do not treat Returned as read-only" is unconditional. Only the two *act-on-it* verbs are configurable.
 - **SLA card on return:** the fulfilment-time counter resets to **0s**, with the prior attempt shown alongside as **"Prev: {duration}"** rather than silently discarded. Scope: **the card shows the immediately-previous attempt only** — if an order returns more than once, earlier attempts are not chained on the card. The full attempt history lives in the Activity tab, surfaced via an inline banner ("Check the Activity tab for more information on the last delivery attempt").
 - **More Information section on return:** Dispatched/Dispatched By/Delivered/Delivered By reset to reflect the fresh, undispatched reality; Created/Created By persist (the order's origin doesn't change).
-- **Return compensation** is set by a rate-card configuration: **No Compensation**, **Fixed Amount**, or **Percentage of Initial Payout** (`returns.compensation.model`). Compensation is reflected in the driver's earnings without requiring a re-drop record.
+- **Return compensation** is two decisions at two levels (reshaped 2026-08-05): the client switches it on at all (`returns.compensation.enabled`, Doc 2 §5), and **each rate card** then sets the model — **No Compensation**, **Fixed Amount**, or **Percentage of Initial Payout** — in Driver Earnings (Doc 5 §6). A client running several rate cards can compensate returns differently per card. Compensation is reflected in the driver's earnings without requiring a re-drop record.
 - The driver is notified within 5 seconds when a return is triggered while they are en route.
 - **SLA reporting rollup — TBD, deferred to the SLA / Fulfilment-Time spec.** Ruled: when a returned order eventually delivers, client-facing SLA reporting counts it as **one rolled-up outcome**, not a breach-plus-success pair. The mechanics (how the rollup is computed, how it's labelled in reports) are specified in Doc 4 (SLA & Fulfilment-Time Specification).
 
@@ -736,15 +764,20 @@ Fully defined in **Configuration Reference (Doc 2)** — no longer TBD. Named he
 | `dispatch.broadcast.rounds` | Number of **typical rounds** in one broadcast sequence, before any fallback round (§7.5.1). **Depot-level** |
 | `dispatch.broadcast.fallbackEnabled` | Whether a closing **fallback round** (all drivers near the depot, group-agnostic) ends the sequence. **Depot-level** |
 | `dispatch.broadcast.preOfferEnabled` | Whether a **pre-offer** broadcast leads round 1 (routing-matched drivers on a compatible route; round 1 only, never repeats). **Depot-level** |
-| `dispatch.broadcast.groups` | The **priority driver groups** assigned to the depot, in priority order (P1 first), each with its acceptance window, max orders, driver count, and retries. Admin-created at company level, then assigned per depot with prioritisation. **Depot-level**; empty for marketplace tenants (no group concept) |
-| `scheduling.autoBroadcast.enabled` | Whether Scheduled orders auto-transition to Broadcasted at T−1h (else → Pending). Client-level |
-| `dispatch.orderWaitTime` | How long a non-scheduled order stays Pending before auto-broadcast (auto-broadcast clients). Drives **both** the §7.2 row-2b countdown ("{N} minutes to broadcast.") **and** the Dispatch Logs tab's On Hold countdown (§7.5.2) — one hold window, shown in two tabs, not two independent timers. Client-level |
-| `pickup.confirmation.enabled` | Pickup PIN + Proof of Pickup requirement. Client-level only, no depot override |
+| `dispatch.broadcast.groups` | The **priority driver groups** assigned to the depot, in priority order (P1 first), each with its acceptance window, max orders, driver count, and retries. Defined and prioritised **per depot** — there is no Company tier (Doc 2 §11; the earlier "admin-created at company level" wording is withdrawn, 2026-08-05). **Depot-level**; empty for marketplace tenants (no group concept). *Canonical name is `broadcast.priorityGroups.config` (Doc 5 §4).* |
+| `scheduling.autoBroadcast.enabled` | **Smart dispatch** — whether Scheduled orders auto-transition to Broadcasted at T−1h (else → Pending). **Depot-level.** Also the **master switch for all broadcasting features**: a depot with it off has **no Dispatch Logs tab** (§7.5) — see the gating note below |
+| `dispatch.orderWaitTime` | **Retired alias — use `broadcast.orderWaitTime` (Doc 5 §4), depot-level, in seconds. User-facing label is always "Order wait time", never "hold window".** How long a non-scheduled order waits before auto-broadcast. Drives **both** the §7.2 row-2b countdown **and** the Dispatch Logs On Hold countdown (§7.5.2) — one wait, shown in two tabs, not two independent timers |
+| `broadcast.orderWaitTime` | **Canonical.** Order wait time before auto-broadcast begins. **Depot-level**, seconds (Doc 5 §4) |
+| `depot.maxOrdersPerTrip` | **Maximum orders one driver may carry per trip.** Depot-level, set at depot creation. Caps dispatch selection size, Change Driver eligibility, and Add-to-Trip targets — see §10.7 |
+| `returns.management.enabled` | Whether **Dispatch** and **Reschedule** are available on Returned orders (§11.3). Client-level, default on. **Does not gate Edit Order** — Returned stays editable regardless |
+| `pickup.confirmation.enabled` | Pickup PIN + Proof of Pickup requirement. **Client default, depot may override** (`depot.pickupConfirmation.override`; ruled 2026-08-05 — symmetric with `delivery.pod.*`) |
 | `delivery.pod.signature.enabled` / `delivery.pod.photo.enabled` | Independent proof-of-delivery toggles |
 | `returns.driverInitiated.enabled` | Whether drivers can start a return from the Driver App |
 | `returns.compensation.model` | `none` / `fixed` / `percentage` |
 
-> **Scope note (added 2026-08-03).** The four `dispatch.broadcast.*` flags are **depot-scoped, not client-scoped** — a client may broadcast from some depots and dispatch manually from others. Doc 2 must model them on the depot record.
+> **Scope note (added 2026-08-03, generalised 2026-08-05).** The four `dispatch.broadcast.*` flags are depot-scoped — a client may broadcast from some depots and dispatch manually from others. **This is now the rule for *all* tenant configuration, not just broadcast:** the depot is the unit of configuration (Doc 2 §11). Two exceptions — `dispatch.fleetType` (platform-provisioned) and `roles.custom.definitions` (tenant-wide).
+
+> **Smart dispatch gates the Dispatch Logs tab (ruled 2026-08-05).** `scheduling.autoBroadcast.enabled` is the entry point to broadcasting. A depot with it **off** dispatches manually only, so the order has no broadcast history and the Order Detail view renders **only Overview + Activity — no Dispatch Logs tab** (§7.5). This is a normal SaaS/managed-fleet configuration, not an edge case: fleet type decides *who* a broadcast reaches, smart dispatch decides *whether* one happens at all. The seven Dispatch Logs states in §7.5.2 all presuppose smart dispatch is on.
 
 > **Configuration tier note.** Most flags in this table are **tenant-admin toggles** (the Admin role sets them; Doc 2 is authoritative). **`dispatch.fleetType` is not one of them** — it is a **platform-provisioned account attribute** set by LETA internal admin from the master account and read-only to the tenant (§2.2). It is listed here only because order-management behaviour depends on it; it must **not** appear as an editable control in any tenant Settings/Administration surface, and **Doc 2 must scope it as platform-provisioned, not a tenant toggle.**
 

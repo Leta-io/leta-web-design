@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { Badge, Button, ContentPrimitives, HoverTip } from '@leta/components';
 import { Icon, type IconName } from '@leta/icons';
-import type { Order } from '../../store/types.js';
+import { expectedOftMinutes, type Order } from '../../store/types.js';
+import { useStore } from '../../store/useStore.js';
 import { fmtClock, type OrderDetailModel } from './detailModel.js';
 import { OrderMiniMap } from './OrderDetailMap.js';
 
@@ -20,7 +21,7 @@ import { OrderMiniMap } from './OrderDetailMap.js';
  *  2. a full-width demarcator.
  *  3. `SLA Visibility` — eyebrow "Total fulfilment time" + ⓘ on the left, the SLA
  *     **badge on that same eyebrow row** (right, SPACE_BETWEEN), then the
- *     "{elapsed} / 30m SLA" metric row below.
+ *     "{elapsed} / {expected OFT}m SLA" metric row below.
  *
  * Presentational: the drawer owns the live ticker and passes the current `elapsed`
  * seconds + resolved `summarySub`; the model supplies title/CTA/badge.
@@ -34,10 +35,13 @@ const CTA_ICON: Record<OrderDetailModel['summary']['cta'], { icon: IconName; out
 
 /**
  * SLA Visibility block — eyebrow row ("Total fulfilment time" + ⓘ | SLA badge) over
- * the "{elapsed} / 30m SLA" metric. The badge sits on the **eyebrow** row now (not
+ * the "{elapsed} / {expected OFT}m SLA" metric. The badge sits on the **eyebrow** row now (not
  * beside the counter). Eyebrow copy is "Total fulfilment time" for every state.
  */
 function SlaBlock({ model, elapsed }: { model: OrderDetailModel; elapsed: number }): React.ReactElement {
+  // The denominator is the DERIVED Expected OFT — the sum of the five stage SLAs
+  // the client authored in Admin → Service Levels (Doc 4 §1), not a fixed string.
+  const expectedOft = useStore((s) => expectedOftMinutes(s.client.config.sla));
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-8px)', width: '100%' }}>
       {/* Content > Eyebrow — label + ⓘ (left) | SLA badge (right) */}
@@ -64,7 +68,7 @@ function SlaBlock({ model, elapsed }: { model: OrderDetailModel; elapsed: number
           run 2 = Body/M/Regular (14/20/-0.28) `--text-default-helper`. */}
       <span style={{ minWidth: 0 }}>
         <span className="text-body-l-semibold" style={{ color: 'var(--text-default-label)' }}>{fmtClock(elapsed)} </span>
-        <span className="text-body-m-regular" style={{ color: 'var(--text-default-helper)' }}>/ 30m SLA</span>
+        <span className="text-body-m-regular" style={{ color: 'var(--text-default-helper)' }}>/ {expectedOft}m SLA</span>
       </span>
     </div>
   );

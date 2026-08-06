@@ -140,6 +140,7 @@ export { ConfigurationCard, ConfigurationCardRow } from './ConfigurationCard/ind
 export type {
   ConfigurationCardProps,
   ConfigurationCardRowProps,
+  ConfigurationCardVariant,
 } from './ConfigurationCard/index.js';
 export { ContentCard, StackedCards } from './ContentCard/index.js';
 export type { ContentCardProps, StackedCardsProps } from './ContentCard/index.js';

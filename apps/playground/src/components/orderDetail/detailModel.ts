@@ -359,7 +359,7 @@ export function buildOrderDetail(
     showProofOfPickup:
       config.pickupConfirmation &&
       (status === 'in-transit' || status === 'arrived' || status === 'returning' || status === 'delivered'),
-    showProofOfDelivery: config.proofOfDelivery && status === 'delivered',
+    showProofOfDelivery: (config.pod.signature || config.pod.photo) && status === 'delivered',
     showReturnedBanner: status === 'returned',
     pickupCode: String(1000 + ((h * 7919) % 9000)),
     recipientEmail: `${first}@gmail.com`,
