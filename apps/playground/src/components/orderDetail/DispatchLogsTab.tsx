@@ -541,10 +541,12 @@ export function DispatchLogsTab({
 
   return (
     <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-24px)', padding: 'var(--padding-24px) var(--padding-16px)' }}>
-      {/* On Hold's neutral nudge / Exhausted's info failure notice. */}
+      {/* On Hold's neutral nudge / Exhausted's error failure notice — the
+          unsuccessful broadcast reads as an error, not information (Figma
+          `1707:131951`, restyled Info → Error 2026-08-06). */}
       {model.banner && (
         <NotificationBanner
-          type={model.banner.kind === 'assign-driver' ? 'neutral' : 'info'}
+          type={model.banner.kind === 'assign-driver' ? 'neutral' : 'error'}
           variant="filled"
           description={model.banner.text}
           cta={
