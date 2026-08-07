@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon, type IconName } from '@leta/icons';
+import { Icon, type IconName } from '@leta-io/icons';
 
 /**
  * Toggle Button (Figma `10900:15545`) — a binary, icon-only switch that holds

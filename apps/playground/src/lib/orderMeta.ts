@@ -1,5 +1,5 @@
-import { AVATAR_PHOTOS } from '@leta/components';
-import { expectedOftMinutes, type DepotOption, type Order, type OrderStatus, type SlaConfig } from '../store/types.js';
+import { AVATAR_PHOTOS } from '@leta-io/components';
+import type { DepotOption, Order } from '../store/types.js';
 import { CANCEL_REASONS } from '../components/CancelOrderModal.js';
 
 /**
@@ -13,7 +13,20 @@ import { CANCEL_REASONS } from '../components/CancelOrderModal.js';
  * model carries them (Doc 2 config + backend data).
  */
 
-export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 export function idHash(id: string): number {
   let s = 0;
@@ -44,7 +57,7 @@ export function formatDateTime(d: Date): string {
 
 // ── Created By (Table spec §2.2) ─────────────────────────────────────────────
 // Clustered/randomized creators — some carry a photo (the exact Figma Avatar
-// Photo 1/2/3 images, shipped as @leta/components assets), the rest render the
+// Photo 1/2/3 images, shipped as @leta-io/components assets), the rest render the
 // empty-teal avatar with their initials. Two automated sources are mixed in:
 // "Storefront" (Auto-create · From online store) and "API" (From connected app).
 export type Creator =
@@ -107,81 +120,26 @@ export function scheduledLabelFor(o: Order): string {
   return `Scheduled: ${day} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, 12:30 PM`;
 }
 
-// ── SLA state + duration — mapped onto `client.config.sla` (Table spec §2.3,
-// Doc 4 §2/§3). ─────────────────────────────────────────────────────────────
+// ── Mock SLA state + duration (Table spec §2.3, Doc 4) ───────────────────────────
 export type SlaState = 'on-target' | 'at-risk' | 'delayed';
 
-/**
- * Which configured stage duration governs the order's CURRENT clock (Doc 4
- * §2's status↔stage table). Absent → no stage clock runs right now: Scheduled
- * hasn't started, and Returning/Returned reset per §2's last sentence (kept
- * as the existing "Prev: {duration}" special-case in `detailModel.ts` —
- * untouched here).
- */
-const STAGE_FOR_STATUS: Partial<Record<OrderStatus, keyof SlaConfig>> = {
-  pending: 'assignment',
-  broadcasted: 'assignment',
-  assigned: 'arriveAtDepot',
-  'at-depot': 'pickup',
-  'in-transit': 'arriveAtDestination',
-  arrived: 'completeAtDestination',
-};
-
-/**
- * Deterministic mock "how long has this order been in its current stage" —
- * still a stable idHash seed, not a wall-clock-ticking value (this module has
- * never ticked live; the Duration column re-derives the same number every
- * render). Ranges 0 → 2× the passed window, so the comparison against that
- * window is what decides the state — shrink a stage's SLA in Admin and the
- * SAME seed pushes more orders past it into At Risk / Delayed; widen it and
- * they pull back to On-Time. That reactivity to `client.config.sla` is the
- * whole point: previously `slaStateFor` picked a state via an independent
- * hash roll and this function reverse-engineered a "plausible" duration to
- * match it, so the badge never actually reacted to the configured targets.
- */
-function stageElapsedSeconds(o: Order, windowSeconds: number): number {
-  return Math.round((idHash(o.id) * 37) % Math.max(1, windowSeconds * 2));
+export function slaStateFor(o: Order): SlaState {
+  const h = idHash(o.id) % 5;
+  return h === 3 ? 'at-risk' : h === 4 ? 'delayed' : 'on-target';
 }
-
-/**
- * Mock stand-in for the platform's real driver-telemetry prediction (Doc 4
- * §3: "using contextual data — driver location, moving speed, direction,
- * depot location, drop-off location"). This prototype has none of that, so a
- * stage crossing this fraction of its configured window stands in for "the
- * platform predicts a miss." Doc 4 §6.2 explicitly leaves the real algorithm
- * and recompute cadence to engineering — this is a placeholder, not a spec.
- */
-const AT_RISK_THRESHOLD = 0.7;
-
-/**
- * On-Time / At Risk / Delayed for an in-progress order (Doc 4 §3), or the
- * binary Within/Beyond-OFT outcome for a finished one (§3.1) — reusing
- * `'on-target'`/`'delayed'` rather than widening the type, since a finished
- * order can never be `'at-risk'` (nothing left to predict).
- */
-export function slaStateFor(o: Order, sla: SlaConfig): SlaState {
-  if (o.status === 'delivered' || o.status === 'cancelled') {
-    const oftSeconds = expectedOftMinutes(sla) * 60;
-    return stageElapsedSeconds(o, oftSeconds) > oftSeconds ? 'delayed' : 'on-target';
-  }
-  const key = STAGE_FOR_STATUS[o.status];
-  if (!key) return 'on-target';
-  const windowSeconds = sla[key] * 60;
-  const elapsed = stageElapsedSeconds(o, windowSeconds);
-  if (elapsed >= windowSeconds) return 'delayed';
-  if (elapsed >= windowSeconds * AT_RISK_THRESHOLD) return 'at-risk';
-  return 'on-target';
+/** Plausible per-state mock elapsed seconds (on-target short, at-risk near the
+ *  SLA boundary, delayed past it). */
+export function durationSecondsFor(o: Order, sla: SlaState, finished: boolean): number {
+  const h = idHash(o.id);
+  const seconds = (h * 7) % 60;
+  let minutes: number;
+  if (finished) minutes = sla === 'delayed' ? 30 + (h % 31) : 8 + (h % 25);
+  else if (sla === 'delayed') minutes = 13 + (h % 22);
+  else if (sla === 'at-risk') minutes = 9 + (h % 5);
+  else minutes = 2 + (h % 10);
+  return minutes * 60 + seconds;
 }
-
-/** The seconds backing `slaStateFor`'s own comparison, so the Duration
- *  cell/counter can never disagree with the badge about how long has elapsed. */
-export function durationSecondsFor(o: Order, sla: SlaConfig, finished: boolean): number {
-  if (finished) return stageElapsedSeconds(o, expectedOftMinutes(sla) * 60);
-  const key = STAGE_FOR_STATUS[o.status];
-  return key ? stageElapsedSeconds(o, sla[key] * 60) : 0;
-}
-
-export function mockDurationFor(o: Order, sla: SlaConfig, finished: boolean): string {
+export function mockDurationFor(o: Order, sla: SlaState, finished: boolean): string {
   const total = durationSecondsFor(o, sla, finished);
   const minutes = Math.floor(total / 60);
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${total % 60}s`;

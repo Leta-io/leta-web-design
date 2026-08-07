@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { ModalDialog, OptionCard, Select, DateTimePicker, NotificationBanner } from '@leta/components';
-import { Icon } from '@leta/icons';
+import { ModalDialog, OptionCard, Select, DateTimePicker, NotificationBanner } from '@leta-io/components';
+import { Icon } from '@leta-io/icons';
 import { Popover } from './Popover.js';
 import { DialogOverlay } from './DialogOverlay.js';
 

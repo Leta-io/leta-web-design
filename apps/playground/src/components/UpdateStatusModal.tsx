@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { ModalDialog, OptionCard } from '@leta/components';
-import { Icon } from '@leta/icons';
+import { ModalDialog, OptionCard } from '@leta-io/components';
+import { Icon } from '@leta-io/icons';
 import type { OrderStatus } from '../store/types.js';
 import { DialogOverlay } from './DialogOverlay.js';
 

@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Badge, Button, ContentPrimitives, HoverTip } from '@leta/components';
-import { Icon, type IconName } from '@leta/icons';
+import { Badge, Button, ContentPrimitives, HoverTip } from '@leta-io/components';
+import { Icon, type IconName } from '@leta-io/icons';
 import { expectedOftMinutes, type Order } from '../../store/types.js';
 import { useStore } from '../../store/useStore.js';
 import { fmtClock, type OrderDetailModel } from './detailModel.js';

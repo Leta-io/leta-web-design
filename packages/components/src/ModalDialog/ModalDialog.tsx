@@ -1,5 +1,5 @@
 import * as React from 'react';
-import type { IconName } from '@leta/icons';
+import type { IconName } from '@leta-io/icons';
 import { ModalShell } from '../Modal/ModalShell.js';
 import { ModalHeaders } from '../ModalHeaders/ModalHeaders.js';
 import { FooterFrame } from '../FooterFrame/FooterFrame.js';

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useLocation } from 'react-router-dom';
-import { EmptyState } from '@leta/components';
+import { EmptyState } from '@leta-io/components';
 
 /** Decorative nav destinations (Dashboard, Drivers, Customers, Settings). */
 export function ComingSoonPage(): React.ReactElement {

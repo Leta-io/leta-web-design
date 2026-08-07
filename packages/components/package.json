@@ -1,11 +1,19 @@
 {
-  "name": "@leta/components",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@leta-io/components",
+  "version": "0.0.1",
+  "private": false,
   "description": "LETA React component library",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leta-io/leta-web-design.git",
+    "directory": "packages/components"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -21,8 +29,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@leta/design-tokens": "workspace:*",
-    "@leta/icons": "workspace:*",
+    "@leta-io/design-tokens": "workspace:*",
+    "@leta-io/icons": "workspace:*",
     "country-flag-icons": "^1.6.17",
     "leaflet": "^1.9.4",
     "lottie-web": "^5.12.2"

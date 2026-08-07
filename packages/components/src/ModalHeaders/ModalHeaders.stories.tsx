@@ -4,7 +4,7 @@ import { ModalHeaders, type ModalHeadersVariant } from './ModalHeaders.js';
 import { PageTabsControl } from '../PageTabsControl/PageTabsControl.js';
 import { Badge, type BadgeColor } from '../Badge/Badge.js';
 import { Button, type ButtonVariant } from '../Button/Button.js';
-import type { IconName } from '@leta/icons';
+import type { IconName } from '@leta-io/icons';
 
 const BADGE_COLORS: BadgeColor[] = [
   'primary', 'caution', 'warning', 'error', 'information',

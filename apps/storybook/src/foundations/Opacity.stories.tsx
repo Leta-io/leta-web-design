@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
-import { tokens } from '@leta/design-tokens';
+import { tokens } from '@leta-io/design-tokens';
 
 /** Fixed chip with the opacity token applied as `opacity`. */
 const OpacityChip = ({ cssVar }: { cssVar: string }) => (

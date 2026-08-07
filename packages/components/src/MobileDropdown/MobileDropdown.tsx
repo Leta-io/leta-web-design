@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { type IconName } from '@leta/icons';
+import { type IconName } from '@leta-io/icons';
 import { MobileMenuOptions, type MobileMenuOptionType } from '../MobileMenuOptions/MobileMenuOptions.js';
 
 export interface MobileDropdownOption {

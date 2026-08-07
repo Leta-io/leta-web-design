@@ -1,4 +1,4 @@
-import type { IconName } from '@leta/icons';
+import type { IconName } from '@leta-io/icons';
 import type { ClientConfig, DepotOption, Driver, Order, OrderStatus } from '../../store/types.js';
 import { DISPATCHER_NAME } from './activityModel.js';
 import { buildDispatchNarrative, type DispatchNarrative } from '../../lib/dispatchNarrative.js';

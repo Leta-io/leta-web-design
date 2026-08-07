@@ -6,8 +6,8 @@ import {
   ContentPrimitives,
   EmptyState,
   NotificationBanner,
-} from '@leta/components';
-import { Icon } from '@leta/icons';
+} from '@leta-io/components';
+import { Icon } from '@leta-io/icons';
 import { BroadcastEventAccordion } from './BroadcastEventAccordion.js';
 import { formatDuration, type BroadcastLeg, type BroadcastModel } from './broadcastModel.js';
 import { useBroadcastSignalIcon } from './broadcastSignal.js';

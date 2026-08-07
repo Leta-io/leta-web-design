@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
 import { LetaLogo } from '../LetaLogo/LetaLogo.js';
 
 export type CollapsedSidebarLogoProps = Omit<

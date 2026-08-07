@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import type { IconName } from '@leta/icons';
+import type { IconName } from '@leta-io/icons';
 import {
   SideBar,
   TopBar,
@@ -9,7 +9,7 @@ import {
   Button,
   type SideBarGroup,
   type BreadcrumbCrumb,
-} from '@leta/components';
+} from '@leta-io/components';
 import { useStore } from '../store/useStore.js';
 import { CURRENT_USER } from '../store/currentUser.js';
 import { UserMenuDropdown } from '../components/UserMenuDropdown.js';

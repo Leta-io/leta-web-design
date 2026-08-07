@@ -1,6 +1,6 @@
 import * as React from 'react';
 import type { Map as LeafletMap } from 'leaflet';
-import { MapView } from '@leta/components';
+import { MapView } from '@leta-io/components';
 import { useStore } from '../store/useStore.js';
 import type { DriverStatus } from '../store/types.js';
 import { MarkerLayer, type MapMarkerSpec } from '../shell/mapMarkers.js';

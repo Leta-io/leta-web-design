@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
-import { tokens } from '@leta/design-tokens';
+import { tokens } from '@leta-io/design-tokens';
 
 /**
  * One demo card showing a single elevation token applied as `box-shadow`.

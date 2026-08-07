@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ModalDialog, SelectionControl, TextArea } from '@leta/components';
+import { ModalDialog, SelectionControl, TextArea } from '@leta-io/components';
 import { DialogOverlay } from './DialogOverlay.js';
 
 /**

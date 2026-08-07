@@ -12,8 +12,8 @@ import {
   TopFilterSection,
   htmlToPlainText,
   useAccordion,
-} from '@leta/components';
-import { Icon, type IconName } from '@leta/icons';
+} from '@leta-io/components';
+import { Icon, type IconName } from '@leta-io/icons';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
 import { activityTimestamp, type ActivityBodyBlock, type ActivityItem, type TitleSegment } from './activityModel.js';
 import { CURRENT_USER } from '../../store/currentUser.js';
