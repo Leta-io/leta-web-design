@@ -42,7 +42,10 @@ import {
 type AdminTab = 'order-management' | 'fleet-management' | 'notifications';
 
 const TABS: { id: AdminTab; label: string; sections: AdminSection[] }[] = [
-  { id: 'order-management', label: 'Order Management', sections: ORDER_MANAGEMENT_SECTIONS },
+  // Tab id/internal section-list name stay "order-management" (matching the IA
+  // doc's §3 heading); only the user-facing label changed to "Deliveries" to
+  // match the product area it configures (ruled 2026-08-07).
+  { id: 'order-management', label: 'Deliveries', sections: ORDER_MANAGEMENT_SECTIONS },
   { id: 'fleet-management', label: 'Fleet Management', sections: FLEET_MANAGEMENT_SECTIONS },
   // Deferred to its own session (IA §2) — the tab exists so the shape of the
   // module is honest, and it says what will live here.
