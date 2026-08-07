@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Badge, ConfigurationCardRow, DesktopSegmentControl } from '@leta/components';
+import { Badge, ConfigurationCardRow, DesktopSegmentControl } from '@leta-io/components';
 import { useStore } from '../../store/useStore.js';
 import { SLA_STAGES, expectedOftMinutes, type ClientConfig, type SlaConfig } from '../../store/types.js';
 import {

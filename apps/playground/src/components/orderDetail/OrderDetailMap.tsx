@@ -1,8 +1,8 @@
 import * as React from 'react';
 import type { Map as LeafletMap, Polyline } from 'leaflet';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Button, FeaturedIcon, MapView } from '@leta/components';
-import { Icon, type IconName } from '@leta/icons';
+import { Button, FeaturedIcon, MapView } from '@leta-io/components';
+import { Icon, type IconName } from '@leta-io/icons';
 import { MarkerLayer, type MapMarkerSpec } from '../../shell/mapMarkers.js';
 import type { Order, OrderStatus } from '../../store/types.js';
 import { idHash } from '../../lib/orderMeta.js';

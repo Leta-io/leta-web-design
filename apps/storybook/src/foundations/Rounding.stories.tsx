@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
-import { tokens } from '@leta/design-tokens';
+import { tokens } from '@leta-io/design-tokens';
 
 /** Fixed 48×48 box with the rounding token applied as `border-radius`. */
 const RoundedBox = ({ cssVar }: { cssVar: string }) => (

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Client, ClientConfig, Driver, Order, OrderStatus, ToastItem } from './types.js';
+import type { Client, ClientConfig, Driver, Order, OrderEdit, OrderStatus, ToastItem } from './types.js';
 import { DEFAULT_CLIENT, MOCK_CLIENTS, MOCK_DRIVERS, MOCK_ORDERS } from './mockData.js';
 
 /**
@@ -66,6 +66,15 @@ interface StoreState {
   assignOrder: (orderId: string, driverId: string) => void;
   /** Cancel an order, capturing the Cancel Order modal's reason codes + note (OM §11.1). */
   cancelOrder: (id: string, reasons?: string[], note?: string) => void;
+  /**
+   * Dispatcher-initiated return (as opposed to a driver failing delivery):
+   * captures the typed reason, then moves the order into the same `returning`
+   * bucket a driver-failed return uses. The Activity trail reads `returnInfo`
+   * to render the dispatcher-attributed shape instead of the driver one.
+   */
+  returnOrder: (id: string, reason: string) => void;
+  /** Append a real (non-mocked) edit-history entry — skipped when `changes` is empty. */
+  recordOrderEdit: (id: string, changes: OrderEdit['changes']) => void;
   /**
    * Dispatcher re-broadcast after an exhausted sequence (OM §7.5): the order goes
    * back to Broadcasted and a fresh sequence starts running live.
@@ -136,21 +145,50 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   updateOrderStatus: (id, status) => {
+    const prev = get().getOrder(id);
+    // Moving a DISPATCHED order (one that has a driver) back to Pending loses
+    // that driver — Pending means back in the unassigned queue, not "still
+    // assigned to whoever had it." Captured as a real `pendingResets` entry so
+    // the Activity trail can show it (`activityModel.ts`'s `finalize`), and
+    // `driverId` is cleared — unlike the terminal transitions below, which
+    // deliberately KEEP it as a historical record of who fulfilled the order.
+    const losingDriver = status === 'pending' && !!prev?.driverId;
+    // Captured before the order's own `driverId` is cleared below, so the
+    // Activity trail's preserved "Order dispatched to {driver}" entry has a
+    // name to show instead of falling back to the generic "the driver".
+    const lostDriver = losingDriver ? get().drivers.find((d) => d.id === prev!.driverId) : null;
     set((s) => ({
-      orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)),
+      orders: s.orders.map((o) => {
+        if (o.id !== id) return o;
+        if (!losingDriver) return { ...o, status };
+        return {
+          ...o,
+          status,
+          driverId: null,
+          pendingResets: [
+            ...(o.pendingResets ?? []),
+            { at: new Date().toISOString(), from: o.status, driverName: lostDriver?.name ?? 'the driver', driverTone: lostDriver?.tone },
+          ],
+        };
+      }),
     }));
-    // Terminal states free the assigned driver.
-    if (status === 'delivered' || status === 'cancelled' || status === 'returned') {
-      const order = get().getOrder(id);
-      if (order?.driverId) {
-        set((s) => ({
-          drivers: s.drivers.map((d) =>
-            d.id === order.driverId
-              ? { ...d, status: 'available', currentOrderId: null }
-              : d,
-          ),
-        }));
-      }
+    // Terminal states free the assigned driver too, but keep `driverId` on
+    // the order itself (see the doc comment on `pendingResets`).
+    const driverToFree =
+      losingDriver ||
+      status === 'delivered' ||
+      status === 'cancelled' ||
+      status === 'returned'
+        ? prev?.driverId
+        : null;
+    if (driverToFree) {
+      set((s) => ({
+        drivers: s.drivers.map((d) =>
+          d.id === driverToFree
+            ? { ...d, status: 'available', currentOrderId: null }
+            : d,
+        ),
+      }));
     }
   },
 
@@ -214,6 +252,29 @@ export const useStore = create<StoreState>((set, get) => ({
       }));
     }
     get().updateOrderStatus(id, 'cancelled');
+  },
+
+  returnOrder: (id, reason) => {
+    set((s) => ({
+      orders: s.orders.map((o) =>
+        o.id === id ? { ...o, returnInfo: { reason, at: new Date().toISOString() } } : o,
+      ),
+    }));
+    // 'returning' isn't a terminal status (the driver still holds the order
+    // while bringing it back), so this doesn't free the driver — same as the
+    // existing driver-failed path into this status.
+    get().updateOrderStatus(id, 'returning');
+  },
+
+  recordOrderEdit: (id, changes) => {
+    if (changes.length === 0) return;
+    set((s) => ({
+      orders: s.orders.map((o) =>
+        o.id === id
+          ? { ...o, edits: [...(o.edits ?? []), { at: new Date().toISOString(), changes }] }
+          : o,
+      ),
+    }));
   },
 
   pushToast: (toast) => {

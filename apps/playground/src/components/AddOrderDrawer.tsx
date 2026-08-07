@@ -18,7 +18,7 @@ import {
   DesktopMenuOptions,
   LeadingInputFieldElement,
   AlertDialog,
-} from '@leta/components';
+} from '@leta-io/components';
 import type { ClientConfig, DepotOption, Order, OrderStatus } from '../store/types.js';
 import type { NewOrderInput } from '../store/useStore.js';
 import { Popover, MenuPanel } from './Popover.js';

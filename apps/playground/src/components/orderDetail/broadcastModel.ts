@@ -14,6 +14,7 @@ import {
   PRE_OFFER_SECONDS,
   resolveLive,
   sequenceTotalSeconds,
+  type LiveLeg,
   type LiveSequence,
 } from './liveBroadcast.js';
 import type { BroadcastDriver, DriverResponseStatus } from './BroadcastEventAccordion.js';
@@ -338,6 +339,21 @@ function buildManagedLegs(
     acceptor?: Acceptor | null;
     /** Real seconds the live leg has been running (from the shared clock). */
     liveLegElapsed?: number;
+    /**
+     * The real-time sequence position (`resolveLive`), when available. When set
+     * and not exhausted, the timeline is built from EXACTLY the legs the clock
+     * says have actually run so far (`live.legs.slice(0, activeIndex + 1)`) —
+     * never padded out to the rest of the round the active leg happens to sit in.
+     *
+     * `reachedRounds`/`reachedFallback` alone can't express "we're mid-round":
+     * they only say which round we're in, not which group within it, so the old
+     * round-based loop below always pushed every group of the reached round and
+     * marked the LAST one live — e.g. rendering "Floaters [P3] Broadcasting"
+     * while the clock had genuinely only reached In-house [P1], and fabricating
+     * "Ran for Ns / Timed out" entries for P2/P3 as if they'd already been
+     * broadcast to and declined, when they hadn't happened yet.
+     */
+    live?: LiveSequence | null;
   },
 ): BroadcastLeg[] {
   const h = idHash(order.id);
@@ -374,25 +390,47 @@ function buildManagedLegs(
     minute += 1;
   };
 
-  for (let round = 1; round <= opts.reachedRounds; round++) {
-    // Pre-offer leads round 1 only, and only when the depot enables it.
-    if (round === 1 && config.preOfferEnabled) {
-      push('pre-offer', 'Pre-Offer', 1, PRE_OFFER_SECONDS, 2, 'Pre-offers are sent to drivers already on a compatible route.');
+  const pushLiveLeg = (leg: LiveLeg) => {
+    const runSeconds = leg.attempts * leg.attemptSeconds;
+    if (leg.kind === 'pre-offer') {
+      push('pre-offer', 'Pre-Offer', leg.round, runSeconds, 2, 'Pre-offers are sent to drivers already on a compatible route.');
+    } else if (leg.kind === 'group') {
+      const g = config.groups[leg.groupIndex!]!;
+      push('group', `${g.name} [P${g.priority}]`, leg.round, runSeconds, Math.min(g.totalDrivers, 5));
+    } else {
+      push('fallback', 'All nearby drivers [Fallback]', leg.round, runSeconds, 5);
     }
-    for (const g of config.groups) {
-      // A group leg runs its acceptance window once per retry — the full course is the
-      // product, and that is the span a "Timed out" driver sat through.
-      push(
-        'group',
-        `${g.name} [P${g.priority}]`,
-        round,
-        g.acceptanceWindowSeconds * Math.max(1, g.retries),
-        Math.min(g.totalDrivers, 5),
-      );
+  };
+
+  if (opts.live && opts.live.activeIndex != null) {
+    // Exact leg-by-leg reconstruction from the live clock — only legs that have
+    // genuinely started broadcasting appear (see the `live` doc comment above).
+    for (const leg of opts.live.legs.slice(0, opts.live.activeIndex + 1)) pushLiveLeg(leg);
+  } else {
+    // Static reconstruction — completed / exhausted / manual-after-exhausted (the
+    // whole configured sequence genuinely ran) or a defensive fallback when no
+    // live clock is available at all. Renders whole rounds since there's no
+    // finer-grained position to render exactly.
+    for (let round = 1; round <= opts.reachedRounds; round++) {
+      // Pre-offer leads round 1 only, and only when the depot enables it.
+      if (round === 1 && config.preOfferEnabled) {
+        push('pre-offer', 'Pre-Offer', 1, PRE_OFFER_SECONDS, 2, 'Pre-offers are sent to drivers already on a compatible route.');
+      }
+      for (const g of config.groups) {
+        // A group leg runs its acceptance window once per retry — the full course is the
+        // product, and that is the span a "Timed out" driver sat through.
+        push(
+          'group',
+          `${g.name} [P${g.priority}]`,
+          round,
+          g.acceptanceWindowSeconds * Math.max(1, g.retries),
+          Math.min(g.totalDrivers, 5),
+        );
+      }
     }
-  }
-  if (opts.reachedFallback) {
-    push('fallback', 'All nearby drivers [Fallback]', null, FALLBACK_SECONDS, 5);
+    if (opts.reachedFallback) {
+      push('fallback', 'All nearby drivers [Fallback]', null, FALLBACK_SECONDS, 5);
+    }
   }
 
   if (legs.length === 0) return legs;
@@ -561,6 +599,7 @@ export function buildBroadcastModel(
         liveLeg: true,
         acceptedAt: null,
         liveLegElapsed: live?.legElapsedSeconds,
+        live,
       });
     } else if (state === 'completed') {
       const reachedRounds = Math.max(1, (h % totalRounds) + 1);
@@ -632,9 +671,16 @@ export function buildBroadcastModel(
       const leg = liveLeg ?? legs[0];
       // A live sequence walks the ladder and then into the fallback sweep without
       // the order's status changing, so the card has to follow the ACTIVE LEG
-      // rather than the state name — otherwise the fallback leg rendered as
-      // "Broadcasting to All nearby drivers [Fallback] drivers".
-      const onFallback = leg?.kind === 'fallback' || state === 'fallback';
+      // rather than the state name — otherwise a seeded fixture pinned to the
+      // `fallback` wireframe shape (`order.broadcastState`, kept fixed purely so
+      // every shape stays reachable for review) claimed to be broadcasting to
+      // "all nearby drivers" from the moment the drawer opened, even while the
+      // real clock was still legitimately on In-house [P1] — contradicting the
+      // Broadcast Logs timeline and Priority Driver Groups drill-down below it,
+      // which both read the clock correctly. `state` only decides whether the
+      // clock runs at all (`live`, above); once it does, ONLY the active leg
+      // may say where the sequence actually is.
+      const onFallback = leg?.kind === 'fallback';
       if (marketplace || onFallback) {
         title = 'Broadcasting to all nearby drivers';
       } else if (leg?.kind === 'pre-offer') {

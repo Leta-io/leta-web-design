@@ -10,8 +10,8 @@ import {
   ContentPrimitives,
   useAccordion,
   type BadgeColor,
-} from '@leta/components';
-import { Icon, type IconName } from '@leta/icons';
+} from '@leta-io/components';
+import { Icon, type IconName } from '@leta-io/icons';
 import { ensureSpinnerStyles, SPINNER_CLASS } from './broadcastSignal.js';
 
 /**
@@ -20,7 +20,7 @@ import { ensureSpinnerStyles, SPINNER_CLASS } from './broadcastSignal.js';
  * broadcast event, expandable to a filterable list of the drivers it was
  * offered to. Playground-local (matches the OrderOverviewCard / Picup Code
  * Banner / Order Detail Accordions precedent) — not promoted to
- * `@leta/components`.
+ * `@leta-io/components`.
  *
  * `type="active"` (still broadcasting) buckets drivers into No response /
  * Declined; `type="completed"` (concluded) buckets into Timed out / Declined

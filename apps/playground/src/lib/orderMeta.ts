@@ -1,5 +1,5 @@
-import { AVATAR_PHOTOS } from '@leta/components';
-import type { DepotOption, Order, OrderStatus } from '../store/types.js';
+import { AVATAR_PHOTOS } from '@leta-io/components';
+import type { DepotOption, Order } from '../store/types.js';
 import { CANCEL_REASONS } from '../components/CancelOrderModal.js';
 
 /**
@@ -13,7 +13,20 @@ import { CANCEL_REASONS } from '../components/CancelOrderModal.js';
  * model carries them (Doc 2 config + backend data).
  */
 
-export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 export function idHash(id: string): number {
   let s = 0;
@@ -44,7 +57,7 @@ export function formatDateTime(d: Date): string {
 
 // ── Created By (Table spec §2.2) ─────────────────────────────────────────────
 // Clustered/randomized creators — some carry a photo (the exact Figma Avatar
-// Photo 1/2/3 images, shipped as @leta/components assets), the rest render the
+// Photo 1/2/3 images, shipped as @leta-io/components assets), the rest render the
 // empty-teal avatar with their initials. Two automated sources are mixed in:
 // "Storefront" (Auto-create · From online store) and "API" (From connected app).
 export type Creator =

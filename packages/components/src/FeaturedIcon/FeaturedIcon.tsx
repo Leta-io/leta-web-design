@@ -1,12 +1,12 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
-import type { IconName } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
+import type { IconName } from '@leta-io/icons';
 
 export type FeaturedIconColor = 'information' | 'highlight' | 'error' | 'success' | 'neutral' | 'warning' | 'teal';
 export type FeaturedIconSize  = 'medium' | 'large';
 
 export interface FeaturedIconProps extends React.HTMLAttributes<HTMLSpanElement> {
-  /** Any icon from @leta/icons. */
+  /** Any icon from @leta-io/icons. */
   icon: IconName;
   /**
    * Semantic color variant — controls background tint and icon tint.

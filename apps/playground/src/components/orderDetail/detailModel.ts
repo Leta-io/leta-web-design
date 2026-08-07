@@ -1,4 +1,4 @@
-import type { IconName } from '@leta/icons';
+import type { IconName } from '@leta-io/icons';
 import type { ClientConfig, DepotOption, Driver, Order, OrderStatus } from '../../store/types.js';
 import { DISPATCHER_NAME } from './activityModel.js';
 import { buildDispatchNarrative, type DispatchNarrative } from '../../lib/dispatchNarrative.js';
@@ -207,22 +207,24 @@ export function buildOrderDetail(
   const status = order.status;
   const creator = creatorFor(order);
   const isFinished = status === 'delivered' || status === 'cancelled';
-  const rawSla = slaStateFor(order);
-  const sla: SlaState = isFinished && rawSla === 'at-risk' ? 'on-target' : rawSla;
+  // Mapped onto the client's own configured stage targets (Doc 4 §2/§3) —
+  // `slaStateFor` already returns the binary Within/Beyond-OFT outcome (never
+  // 'at-risk') for finished orders, so there's no separate collapse needed.
+  const sla: SlaState = slaStateFor(order, config.sla);
   const scheduled = scheduledDateFor(order);
   // One derivation of dispatch provenance for the whole drawer.
   const narrative = buildDispatchNarrative(order, config, driver?.name ?? null);
 
   // Elapsed counter base (§7.2 counter window): Scheduled + Returned start at 0.
   const elapsedBase =
-    status === 'scheduled' || status === 'returned' ? 0 : durationSecondsFor(order, sla, isFinished);
+    status === 'scheduled' || status === 'returned' ? 0 : durationSecondsFor(order, config.sla, isFinished);
 
   // SLA badge: hidden while nothing has elapsed (Scheduled); "Prev" on Returned.
   const slaBadge: OrderDetailModel['slaBadge'] =
     status === 'scheduled'
       ? null
       : status === 'returned'
-        ? { label: `Prev: ${fmtClock(durationSecondsFor(order, 'delayed', true))}`, color: 'neutral', icon: 'History' }
+        ? { label: `Prev: ${fmtClock(durationSecondsFor(order, config.sla, true))}`, color: 'neutral', icon: 'History' }
         : sla === 'delayed'
           ? { label: 'Delayed', color: 'error', icon: 'Error' }
           : sla === 'at-risk'
@@ -392,7 +394,7 @@ export function buildOrderDetail(
       { label: 'Proof of Delivery', fileName: 'Image.png', src: images.photo, viewer: 'image', title: 'Proof of Delivery' },
       { label: 'Recipient Signature', fileName: 'Image.png', src: images.signature, viewer: 'signature', title: 'Recipient Signature' },
     ],
-    prevAttempt: fmtClock(durationSecondsFor(order, 'delayed', true)),
+    prevAttempt: fmtClock(durationSecondsFor(order, config.sla, true)),
     estWindow,
     terminalTime,
   };

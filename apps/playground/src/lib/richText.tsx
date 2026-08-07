@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { sanitizeRichText } from '@leta/components';
+import { sanitizeRichText } from '@leta-io/components';
 
 // Converts a Rich Text Area value into real React elements — never raw markup
 // injection. `sanitizeRichText` already reduces the string to a fixed allowlist

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ContentPrimitives, type ContentPrimitivesType } from './ContentPrimitives.js';
-import { Icon, type IconName } from '@leta/icons';
+import { Icon, type IconName } from '@leta-io/icons';
 import { Button } from '../Button/Button.js';
 import { SelectionControl } from '../SelectionControl/SelectionControl.js';
 

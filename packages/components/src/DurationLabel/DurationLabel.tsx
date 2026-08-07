@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
 import { HoverTip } from '../Tooltip/HoverTip.js';
 
 export type DurationLabelVariant = 'finished' | 'active';

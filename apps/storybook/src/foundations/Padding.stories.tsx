@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
-import { tokens } from '@leta/design-tokens';
+import { tokens } from '@leta-io/design-tokens';
 
 /** Bar whose width equals the resolved CSS value of the padding token. */
 const Bar = ({ cssVar }: { cssVar: string }) => (

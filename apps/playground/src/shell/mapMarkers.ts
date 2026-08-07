@@ -1,7 +1,7 @@
 import * as L from 'leaflet';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MapIcon, type MapIconProps, type MapIconVariant } from '@leta/components';
+import { MapIcon, type MapIconProps, type MapIconVariant } from '@leta-io/components';
 
 /**
  * Map-marker integration for `MapView`.

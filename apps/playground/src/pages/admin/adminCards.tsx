@@ -5,7 +5,7 @@ import {
   ConfigurationCard,
   ConfigurationCardRow,
   Stepper,
-} from '@leta/components';
+} from '@leta-io/components';
 
 /**
  * The card shapes the Admin module is built from (IA §6) — thin presets over the

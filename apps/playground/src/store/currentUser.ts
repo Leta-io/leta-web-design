@@ -1,4 +1,4 @@
-import type { AvatarTone } from '@leta/components';
+import type { AvatarTone } from '@leta-io/components';
 
 /**
  * The signed-in dispatcher — a single source of truth for the account's identity

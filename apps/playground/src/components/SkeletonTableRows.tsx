@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Skeleton, type TableColumn } from '@leta/components';
+import { Skeleton, type TableColumn } from '@leta-io/components';
 
 interface SkeletonTableRowsProps {
   /** The active table's real column set — cell widths mirror it exactly (fixed

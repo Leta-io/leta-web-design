@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { type IconName } from '@leta/icons';
+import { type IconName } from '@leta-io/icons';
 import { FieldChrome } from '../InputField/FieldChrome.js';
 import { Stepper, type StepperVariant } from '../Stepper/Stepper.js';
 

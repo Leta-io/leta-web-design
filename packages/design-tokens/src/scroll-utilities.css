@@ -1,6 +1,6 @@
 /**
  * Scroll Utilities — LETA Design System
- * @leta/design-tokens/scroll-utilities.css
+ * @leta-io/design-tokens/scroll-utilities.css
  *
  * Overscroll behaviour utilities that control scroll chaining.
  * Import alongside tokens.css and text-styles.css wherever the design system
@@ -31,7 +31,7 @@
  *
  * ─── Usage in playground / host app (class-based) ─────────────────────────
  *
- *   import '@leta/design-tokens/scroll-utilities.css';
+ *   import '@leta-io/design-tokens/scroll-utilities.css';
  *
  *   // Internal panel
  *   <div className="scroll-isolated" style={{ overflowY: 'auto', maxHeight: 300 }}>

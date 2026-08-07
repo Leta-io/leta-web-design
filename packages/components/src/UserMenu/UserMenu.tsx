@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
 import { Avatar, type AvatarTone } from '../Avatar/Avatar.js';
 
 export type UserMenuState = 'idle' | 'hover' | 'pressed';

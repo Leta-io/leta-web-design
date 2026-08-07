@@ -11,8 +11,8 @@ import {
   Table,
   TableDataControl,
   type TableColumn,
-} from '@leta/components';
-import { Icon } from '@leta/icons';
+} from '@leta-io/components';
+import { Icon } from '@leta-io/icons';
 import { DriverGroupCard } from './DriverGroupCard.js';
 import type { BroadcastModel, NotifiedDriver } from './broadcastModel.js';
 import type { DriverGroup, Order } from '../../store/types.js';

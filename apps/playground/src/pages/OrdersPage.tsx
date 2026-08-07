@@ -25,11 +25,11 @@ import {
   type TableColumn,
   type TableRow,
   type TopFilterSectionItem,
-} from '@leta/components';
-import type { IconName } from '@leta/icons';
+} from '@leta-io/components';
+import type { IconName } from '@leta-io/icons';
 import { useStore } from '../store/useStore.js';
 import type { NewOrderInput } from '../store/useStore.js';
-import type { DepotOption, Order, OrderStatus } from '../store/types.js';
+import type { DepotOption, Order, OrderStatus, SlaConfig } from '../store/types.js';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_ICON, ORDER_STATUS_LABEL } from '../store/types.js';
 import { Popover, MenuPanel, MenuDivider } from '../components/Popover.js';
 import { SkeletonTableRows } from '../components/SkeletonTableRows.js';
@@ -53,6 +53,7 @@ import {
 import { buildDispatchNarrative } from '../lib/dispatchNarrative.js';
 import { AddOrderDrawer } from '../components/AddOrderDrawer.js';
 import { CancelOrderModal } from '../components/CancelOrderModal.js';
+import { ReturnOrderModal } from '../components/ReturnOrderModal.js';
 import { UpdateStatusModal, type UpdateStatusTarget } from '../components/UpdateStatusModal.js';
 import { RescheduleModal } from '../components/RescheduleModal.js';
 import { OrderDetailDrawer } from '../components/orderDetail/OrderDetailDrawer.js';
@@ -86,7 +87,7 @@ function loadRowsPerPage(): number {
 // Columns dropdown; any active extra splices in before Status and switches the table
 // into horizontal-scroll mode (spec §4.3: pinned Order ID/Actions, middle scrolls).
 // Both LAST_UPDATED_COLUMN and CREATED_BY_COLUMN are canonical presets from
-// @leta/components — Created By renders the `user-cell` (avatar + name + email);
+// @leta-io/components — Created By renders the `user-cell` (avatar + name + email);
 // the playground only supplies the per-row name/email/avatarSrc data (from the
 // shared CREATORS mock in lib/orderMeta.ts — also used by the Order Detail drawer).
 type ExtraColumnKey = 'lastUpdated' | 'createdBy';
@@ -163,13 +164,11 @@ function rescheduleData(selected: Order[]): RescheduleData {
 // map draws), so "Low to High" / "High to Low" order by actual trip length.
 type SortField = 'created' | 'duration' | 'lastUpdated' | 'distance';
 const SORT_FIELDS: SortField[] = ['created', 'duration', 'lastUpdated', 'distance'];
-function sortValueFor(o: Order, field: SortField): number {
+function sortValueFor(o: Order, field: SortField, slaConfig: SlaConfig): number {
   if (field === 'distance') return distanceKmFor(o);
   if (field === 'duration') {
     const isFinished = o.status === 'delivered' || o.status === 'cancelled';
-    const rawSla = slaStateFor(o);
-    const sla: SlaState = isFinished && rawSla === 'at-risk' ? 'on-target' : rawSla;
-    return durationSecondsFor(o, sla, isFinished);
+    return durationSecondsFor(o, slaConfig, isFinished);
   }
   return new Date(o.createdAt).getTime();
 }
@@ -320,6 +319,8 @@ export function OrdersPage(): React.ReactElement {
   const updateOrder = useStore((s) => s.updateOrder);
   const assignOrder = useStore((s) => s.assignOrder);
   const cancelOrder = useStore((s) => s.cancelOrder);
+  const returnOrder = useStore((s) => s.returnOrder);
+  const recordOrderEdit = useStore((s) => s.recordOrderEdit);
   const rebroadcastOrder = useStore((s) => s.rebroadcastOrder);
   const exhaustBroadcast = useStore((s) => s.exhaustBroadcast);
   const pushToast = useStore((s) => s.pushToast);
@@ -603,8 +604,8 @@ export function OrdersPage(): React.ReactElement {
     if (sortFieldIndex == null) return filtered;
     const field = SORT_FIELDS[sortFieldIndex]!;
     const dir = sortDir === 'asc' ? 1 : -1;
-    return [...filtered].sort((a, b) => (sortValueFor(a, field) - sortValueFor(b, field)) * dir);
-  }, [filtered, sortFieldIndex, sortDir]);
+    return [...filtered].sort((a, b) => (sortValueFor(a, field, clientConfig.sla) - sortValueFor(b, field, clientConfig.sla)) * dir);
+  }, [filtered, sortFieldIndex, sortDir, clientConfig.sla]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
   const clampedPage = Math.min(page, pageCount);
@@ -785,9 +786,27 @@ export function OrdersPage(): React.ReactElement {
     if (ids.length > 1) clearSelection();
   };
   const bulkCancel = () => requestCancel(selectedOrders().map((o) => o.id));
-  // Return Order (§11.3) isn't built yet — stubs a toast, mirroring the row-level
-  // ⋯ menu's Return Order action (also unwired).
-  const bulkReturn = () => pushToast({ type: 'success', title: 'Return Order', subtitle: 'This action is coming soon.' });
+
+  // Return Order (§11.3) — a dispatcher marking an in-progress order for
+  // return, distinct from a driver failing the delivery from the Driver App.
+  // Same reason-capture-then-confirm shape as Cancel Order, sharing the modal
+  // across the row ⋯ menu, the bulk toolbar, and the View drawer footer.
+  const [returnConfirm, setReturnConfirm] = React.useState<string[] | null>(null);
+  const requestReturn = (ids: string[]) => setReturnConfirm(ids);
+  const confirmReturn = (reason: string) => {
+    const ids = returnConfirm ?? [];
+    ids.forEach((id) => returnOrder(id, reason));
+    setReturnConfirm(null);
+    if (ids.length === 0) return;
+    resolveActionOutcome({
+      orderIds: ids,
+      newStatus: 'returning',
+      ...pluralOrderCopy(ids.length, 'marked for return', 'marked for return'),
+      cta: { kind: 'view-orders', label: 'View Orders', ...viewFor('returning') },
+    });
+    if (ids.length > 1) clearSelection();
+  };
+  const bulkReturn = () => requestReturn(selectedOrders().map((o) => o.id));
 
   // Update Status (OM §12.6) + Reschedule (OM §11.2) — both reachable from the row
   // ⋯ menu (1 order) and the bulk toolbar's ⋯ (N selected). Each holds the order
@@ -976,6 +995,26 @@ export function OrdersPage(): React.ReactElement {
   const handleOrderEdited = (input: NewOrderInput) => {
     if (!editingOrder) return;
     const status = editingOrder.status;
+    // The real (not mocked) edit-history diff — one entry per field the save
+    // actually changed, becoming an "Order Edited" Activity row (Figma
+    // `1487:173233`). Compared against the pre-edit snapshot captured in
+    // `editingOrder`, before `updateOrder` below overwrites it.
+    const FIELD_LABELS: [keyof NewOrderInput | 'dropoff', string][] = [
+      ['customer', 'Recipient name'],
+      ['phone', 'Phone number'],
+      ['depot', 'Pickup depot'],
+      ['dropoff', 'Delivery address'],
+      ['package', 'Package'],
+    ];
+    const changes = FIELD_LABELS.flatMap(([key, field]) => {
+      const from = key === 'dropoff' ? editingOrder.dropoff.label : String(editingOrder[key as keyof Order] ?? '');
+      const to = key === 'dropoff' ? input.dropoff.label : String(input[key as keyof NewOrderInput] ?? '');
+      return from !== to && to ? [{ field, from, to }] : [];
+    });
+    if (input.items !== editingOrder.items) {
+      changes.push({ field: 'Items', from: String(editingOrder.items), to: String(input.items) });
+    }
+    if (changes.length > 0) recordOrderEdit(editingOrder.id, changes);
     updateOrder(editingOrder.id, {
       customer: input.customer,
       phone: input.phone,
@@ -1109,10 +1148,11 @@ export function OrdersPage(): React.ReactElement {
     const driver = getDriver(o.driverId);
     const isFinished = o.status === 'delivered' || o.status === 'cancelled';
     // §2.3 SLA state — counting only for dispatched + pending/broadcasted rows;
-    // finished rows keep their final verdict (at-risk collapses to on-target).
+    // finished rows keep their final verdict. Mapped onto the client's own
+    // configured stage targets (Doc 4 §2/§3) — `slaStateFor` already returns
+    // the binary Within/Beyond-OFT outcome (never 'at-risk') for finished rows.
     const slaCounting = GROUP_STATUSES.dispatched.includes(o.status) || o.status === 'pending' || o.status === 'broadcasted';
-    const rawSla = slaStateFor(o);
-    const sla: SlaState = isFinished && rawSla === 'at-risk' ? 'on-target' : rawSla;
+    const sla: SlaState = slaStateFor(o, clientConfig.sla);
     const actionsCell: TableRow['cells'][number] = {
       type: 'actions',
       // Delivered/Cancelled are terminal — a single "View Logs" button replaces
@@ -1226,7 +1266,7 @@ export function OrdersPage(): React.ReactElement {
             type: 'duration',
             durationVariant: isFinished ? 'finished' : 'active',
             durationStatus: sla,
-            durationTime: mockDurationFor(o, sla, isFinished),
+            durationTime: mockDurationFor(o, clientConfig.sla, isFinished),
             // Finished rows: hover tooltip on the leading Within/Beyond-OFT icon.
             durationIconTooltip: isFinished
               ? sla === 'delayed' ? 'Delivery delayed' : 'Delivery on time'
@@ -1482,6 +1522,7 @@ export function OrdersPage(): React.ReactElement {
           onClose={() => setOverlay(null)}
           pushToast={pushToast}
           onRequestCancel={requestCancel}
+          onRequestReturn={requestReturn}
           subStatus={subStatus}
           onPickStatus={handlePickStatus}
           countByStatus={countByStatus}
@@ -1530,6 +1571,7 @@ export function OrdersPage(): React.ReactElement {
         actions={{
           dispatch: dispatchOrder,
           requestCancel,
+          requestReturn,
           requestUpdateStatus,
           requestReschedule,
           requestEdit,
@@ -1572,6 +1614,17 @@ export function OrdersPage(): React.ReactElement {
         />
       )}
 
+      {/* Return Order modal (OM §11.3, Figma Activity `1489:183266`) — the typed
+          reason gating a dispatcher-initiated return; reused for a single order
+          and a bulk selection, and from the View drawer footer. */}
+      {returnConfirm && (
+        <ReturnOrderModal
+          orderIds={returnConfirm}
+          onClose={() => setReturnConfirm(null)}
+          onConfirm={confirmReturn}
+        />
+      )}
+
       {/* Update Status modal (OM §12.6, Figma 1239:108227) — status-gated options. */}
       {updateStatusFor && (
         <UpdateStatusModal
@@ -1605,6 +1658,7 @@ interface OverlayHostProps {
   onClose: () => void;
   pushToast: (t: { type: 'success' | 'warning' | 'error'; title: string; subtitle?: string }) => void;
   onRequestCancel: (ids: string[]) => void;
+  onRequestReturn: (ids: string[]) => void;
   subStatus: OrderStatus | null;
   onPickStatus: (group: Exclude<FilterTab, 'all'>, status: OrderStatus) => void;
   countByStatus: Record<OrderStatus, number>;
@@ -1646,7 +1700,7 @@ interface OverlayHostProps {
   onViewLogs: (orderId: string) => void;
 }
 
-function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, onPickStatus, countByStatus, selectedOrderList, deselect, onCreatedLabel, extraCols, onToggleColumn, filterGroups, appliedFilters, filterPreviewCount, onFilterSelectionChange, onFilterApply, onFilterReset, onImport, onSortChange, rowsPerPage, onRowsPerPage, onRequestUpdateStatus, onRequestReschedule, onRequestEdit, onAddToTrip, onChangeDriver, onAddComment, onViewLogs }: OverlayHostProps): React.ReactElement {
+function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, onRequestReturn, subStatus, onPickStatus, countByStatus, selectedOrderList, deselect, onCreatedLabel, extraCols, onToggleColumn, filterGroups, appliedFilters, filterPreviewCount, onFilterSelectionChange, onFilterApply, onFilterReset, onImport, onSortChange, rowsPerPage, onRowsPerPage, onRequestUpdateStatus, onRequestReschedule, onRequestEdit, onAddToTrip, onChangeDriver, onAddComment, onViewLogs }: OverlayHostProps): React.ReactElement {
   const { kind, anchor, orderId, orderStatus, group } = overlay;
 
   if (kind === 'rowsPerPage') {
@@ -1854,10 +1908,9 @@ function OverlayHost({ overlay, onClose, pushToast, onRequestCancel, subStatus, 
                 leadingIcon={menu.destructive.icon}
                 onSelect={() => {
                   onClose();
-                  // Cancel opens the reason-capture modal; Return (§11.3, not yet
-                  // built) stubs a toast for now.
+                  // Cancel and Return both open their own reason-capture modal.
                   if (menu.destructive!.label === 'Cancel Order') onRequestCancel([orderId]);
-                  else pushToast({ type: 'success', title: menu.destructive!.label, subtitle: 'This action is coming soon.' });
+                  else onRequestReturn([orderId]);
                 }}
               />
             </>

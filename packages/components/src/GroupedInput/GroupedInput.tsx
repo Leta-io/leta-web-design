@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
 import { InputField } from '../InputField/InputField.js';
 import { StepperInput } from '../StepperInput/StepperInput.js';
 import { Stepper } from '../Stepper/Stepper.js';

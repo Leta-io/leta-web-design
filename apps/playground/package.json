@@ -12,9 +12,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@leta/design-tokens": "workspace:*",
-    "@leta/icons": "workspace:*",
-    "@leta/components": "workspace:*",
+    "@leta-io/design-tokens": "workspace:*",
+    "@leta-io/icons": "workspace:*",
+    "@leta-io/components": "workspace:*",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

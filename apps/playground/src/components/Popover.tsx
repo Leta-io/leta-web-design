@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
-import { useEscapeLayer } from '@leta/components';
+import { useEscapeLayer } from '@leta-io/components';
 
 export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
 
@@ -68,7 +68,7 @@ let currentForceClose: (() => void) | null = null;
  *
  * **Single-open (Doc 3 §1):** opening a Popover force-closes any other open
  * Popover, platform-wide. **Escape (Doc 3 §10):** registered on the shared
- * `@leta/components` overlay stack, so Escape closes only the topmost overlay
+ * `@leta-io/components` overlay stack, so Escape closes only the topmost overlay
  * even when a Popover is nested inside a modal/drawer. **Focus-return (Doc 3
  * §1.3/§10):** the element focused at the moment this Popover opened (almost
  * always its trigger — clicking a button focuses it) regains focus once the
@@ -104,7 +104,7 @@ export function Popover({
   React.useEffect(() => () => { if (exitTimerRef.current) clearTimeout(exitTimerRef.current); }, []);
 
   // Escape closes only the topmost overlay — shared with modals/drawers via
-  // `@leta/components`' overlay stack (Doc 3 §10).
+  // `@leta-io/components`' overlay stack (Doc 3 §10).
   useEscapeLayer(true, handleClose);
 
   // Single-open (Doc 3 §1) + focus-return (§1.3/§10): every call site mounts

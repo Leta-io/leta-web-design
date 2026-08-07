@@ -1,11 +1,19 @@
 {
-  "name": "@leta/icons",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@leta-io/icons",
+  "version": "0.0.1",
+  "private": false,
   "description": "LETA SVG icon React components",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leta-io/leta-web-design.git",
+    "directory": "packages/icons"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -16,11 +24,11 @@
     "dist"
   ],
   "scripts": {
-    "registry": "tsx scripts/build-registry.ts",
-    "prebuild": "pnpm registry",
+    "registry": "bun scripts/build-registry.ts",
+    "prebuild": "bun scripts/build-registry.ts",
     "build": "tsup src/index.ts --format esm --dts --out-dir dist",
     "lint": "eslint src",
-    "typecheck": "pnpm registry && tsc --noEmit"
+    "typecheck": "bun scripts/build-registry.ts && tsc --noEmit"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0"

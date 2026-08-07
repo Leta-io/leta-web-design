@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon, type IconName } from '@leta/icons';
+import { Icon, type IconName } from '@leta-io/icons';
 import { SelectionControl } from '../SelectionControl/SelectionControl.js';
 import { Chip } from '../Chip/Chip.js';
 import { Shortcut } from '../Shortcut/Shortcut.js';

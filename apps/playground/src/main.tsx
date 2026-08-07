@@ -1,14 +1,14 @@
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { LetaThemeProvider } from '@leta/design-tokens';
+import { LetaThemeProvider } from '@leta-io/design-tokens';
 
 // Design-token cascade — mirrors Storybook's preview.tsx so components render
 // with the full token + typography + font setup.
-import '@leta/design-tokens/css';
-import '@leta/design-tokens/text-styles.css';
-import '@leta/design-tokens/scroll-utilities.css';
-import '@leta/design-tokens/fonts';
+import '@leta-io/design-tokens/css';
+import '@leta-io/design-tokens/text-styles.css';
+import '@leta-io/design-tokens/scroll-utilities.css';
+import '@leta-io/design-tokens/fonts';
 
 import { App } from './App.js';
 
