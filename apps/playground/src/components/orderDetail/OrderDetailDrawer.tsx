@@ -296,6 +296,7 @@ function ProofRow({ file, onView }: { file: ProofFile; onView: (f: ProofFile) =>
 export interface OrderDetailActions {
   dispatch: (id: string) => void;
   requestCancel: (ids: string[]) => void;
+  requestReturn: (ids: string[]) => void;
   requestUpdateStatus: (ids: string[]) => void;
   requestReschedule: (ids: string[]) => void;
   requestEdit: (id: string) => void;
@@ -676,7 +677,7 @@ function DrawerBody({
   const runAction = (key: string) => {
     switch (key) {
       case 'cancel': return actions.requestCancel([order.id]);
-      case 'return': return actions.stub('Return Order');
+      case 'return': return actions.requestReturn([order.id]);
       case 'addToTrip': return actions.addToTrip(order.id);
       case 'changeDriver': return actions.changeDriver(order.id);
       case 'editOrder': return actions.requestEdit(order.id);
