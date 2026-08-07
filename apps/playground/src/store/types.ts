@@ -86,6 +86,54 @@ export interface Order {
    * out on a broadcast.
    */
   broadcastStartedAt?: number;
+  /**
+   * Real (not mocked) edit history — appended by the Edit Order flow whenever a
+   * save actually changes a field. Rendered as "Order Edited" Activity entries
+   * (`activityModel.ts`), merged into the synthesized trail by real timestamp
+   * alongside it. In-session only, like `rebroadcastCount` — seeded fixtures
+   * start with none.
+   */
+  edits?: OrderEdit[];
+  /**
+   * Set only when a DISPATCHER marks the order for return via the platform
+   * (as opposed to a driver failing the delivery from the Driver App) — the
+   * Activity trail branches on this to render "Dispatcher Activity (Return
+   * Order)" (avatar + "{dispatcher} marked the order for return" + the typed
+   * reason) instead of the default "Driver Activity (Failed)" shape. Absent on
+   * every seeded fixture, so existing driver-failed mocks are unaffected.
+   */
+  returnInfo?: { reason: string; at: string };
+  /**
+   * Real history of "Mark as Pending" actions that pulled this order — while
+   * it had a driver — back into the unassigned queue. Pending means back in
+   * the queue, not "still assigned to whoever had it," so the transition also
+   * clears `driverId` (unlike the delivered/cancelled/returned transitions,
+   * which deliberately KEEP it as a historical record of who fulfilled the
+   * order). Rendered as an "Order Status Update (Manual)" Activity entry
+   * ("{dispatcher} marked the order as pending", Figma `1487:173228`) — `from`
+   * is the status held right before the reset, so the badges read correctly.
+   */
+  pendingResets?: {
+    at: string;
+    from: OrderStatus;
+    /**
+     * The driver's name/tone AT THE MOMENT of the reset, captured because
+     * `driverId` is cleared in the same action — without this, the Activity
+     * trail's OLD "Order dispatched to {driver}" entry (preserved so the
+     * order's dispatch history doesn't just vanish) would have nothing to
+     * look the driver up by and would fall back to the generic "the driver".
+     */
+    driverName: string;
+    driverTone?: AvatarTone;
+  }[];
+}
+
+/** One save of the Edit Order drawer that actually changed something. */
+export interface OrderEdit {
+  /** ISO datetime of the save — real, not the synthesized mock cursor. */
+  at: string;
+  /** One entry per field that changed; empty saves never get recorded at all. */
+  changes: { field: string; from: string; to: string }[];
 }
 
 export interface Driver {

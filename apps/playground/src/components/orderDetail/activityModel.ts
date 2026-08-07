@@ -151,6 +151,44 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
     return cursor;
   };
 
+  // Real edit history (`AddOrderDrawer` → `recordOrderEdit`) rides on the SAME
+  // returned array, so every early-return path below must go through this —
+  // merged in at each edit's ACTUAL timestamp, not the synthesized mock cursor,
+  // then the whole trail is re-sorted chronologically. In practice a fresh
+  // edit's real `Date.now()` lands well after every synthesized timestamp
+  // (those are minutes off a mock `createdAt` that is usually days in the
+  // past), so it naturally surfaces at the top of the newest-first Activity
+  // list without needing to special-case where it gets spliced in.
+  const finalize = (built: ActivityItem[]): ActivityItem[] => {
+    for (const edit of order.edits ?? []) {
+      built.push({
+        id: `edit-${edit.at}`,
+        leading: { kind: 'icon', icon: 'Edit' },
+        title: [{ kind: 'text', text: 'Order edited by' }, dispatcherActor()],
+        timestamp: new Date(edit.at),
+        blocks: edit.changes.map((c) => ({ kind: 'field', icon: 'Document', lead: `${c.field} changed from`, from: c.from, to: c.to })),
+        kind: 'event',
+      });
+    }
+    // "Order Status Update (Manual)" (Figma `1487:173228`) — a dispatcher
+    // pulling a dispatched order back to Pending by hand, which lost it its
+    // driver (`pendingResets`, `useStore.ts`'s `updateOrderStatus`). Reuses the
+    // same generic `status` block every other transition already renders — the
+    // badges adapt from `from`/`to` with no special-casing needed.
+    for (const reset of order.pendingResets ?? []) {
+      built.push({
+        id: `pending-reset-${reset.at}`,
+        leading: dispatcherLeading(),
+        title: [{ kind: 'name', text: DISPATCHER_NAME }, { kind: 'text', text: 'marked the order as pending' }],
+        timestamp: new Date(reset.at),
+        blocks: [{ kind: 'status', icon: 'Order-Status', lead: 'Order status changed from', from: reset.from, to: 'pending' }],
+        kind: 'event',
+      });
+    }
+    built.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return built;
+  };
+
   const humanCreator = creator.source === 'human';
 
   // 1. Creation — always the first entry (Order Manual/Automatic Creation).
@@ -165,8 +203,14 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
     kind: 'event',
   });
 
-  const driverName = driver?.name ?? 'the driver';
-  const driverTone: AvatarTone | undefined = driver?.tone;
+  // A `pendingResets` entry means `order.driverId` was cleared by the very
+  // reset whose history we're about to re-synthesize below — so the live
+  // `driver` lookup is null by the time we get here. Fall back to the name
+  // captured at the moment of the reset, so the preserved "Order dispatched
+  // to {driver}" entry names who it actually was, not the generic fallback.
+  const lastReset = order.pendingResets?.at(-1);
+  const driverName = driver?.name ?? (order.status === 'pending' ? lastReset?.driverName : undefined) ?? 'the driver';
+  const driverTone: AvatarTone | undefined = driver?.tone ?? (order.status === 'pending' ? lastReset?.driverTone : undefined);
   let prev: OrderStatus = 'pending';
 
   /**
@@ -240,8 +284,19 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
     }
   }
 
-  const { steps, offPath } = planSteps(order.status, h, !!driver);
-  if (steps.length === 0 && !offPath) return items;
+  // `planSteps` re-derives the driver progression purely from the CURRENT
+  // status — correct for a smooth forward lifecycle, but a `pendingResets`
+  // entry means this order was pulled BACKWARD to Pending from further along
+  // (e.g. Assigned). Without this, the whole progression that got it there
+  // (its dispatch entry, any at-depot/comment steps) would silently vanish the
+  // moment status flips to `pending`, leaving only the new "marked as pending"
+  // entry with no explanation of how the order got a driver in the first
+  // place. Synthesizing against the LATEST reset's `from` instead preserves
+  // that history; the reset event itself is appended on top by `finalize`.
+  // (`lastReset` itself is computed once, above, alongside `driverName`.)
+  const progressionStatus = order.status === 'pending' && lastReset ? lastReset.from : order.status;
+  const { steps, offPath } = planSteps(progressionStatus, h, !!driver);
+  if (steps.length === 0 && !offPath) return finalize(items);
 
   steps.forEach((to, i) => {
     const from = prev;
@@ -416,17 +471,40 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
       kind: 'event',
     });
   } else if (offPath === 'returning' || offPath === 'returned') {
-    items.push({
-      id: 'returning',
-      leading: { kind: 'avatar', name: driverName, tone: driverTone },
-      title: [{ kind: 'name', text: driverName }, { kind: 'text', text: 'failed the order' }],
-      timestamp: bump(5 + (h % 20)),
-      blocks: [
-        { kind: 'status', icon: 'Order-Status', lead: 'Order status changed from', from: prev, to: 'returning' },
-        { kind: 'comment', text: MOCK_RETURN_REASONS[h % MOCK_RETURN_REASONS.length]! },
-      ],
-      kind: 'event',
-    });
+    // Two distinct shapes for how an order ends up "returning" (Figma
+    // `1487:173235`): a DRIVER failing the delivery from the Driver App
+    // (`Driver Activity (Failed)` — driver avatar, "{driver} failed the
+    // order", the reason lives on the driver's report) vs a DISPATCHER
+    // marking it for return from the platform (`Dispatcher Activity (Return
+    // Order)` — dispatcher avatar, "{dispatcher} marked the order for
+    // return", the reason is what THEY typed into the Return Order modal).
+    // `order.returnInfo` is only set by the latter (`returnOrder()`); every
+    // seeded fixture leaves it unset and keeps the driver-failed shape.
+    if (order.returnInfo) {
+      items.push({
+        id: 'returning',
+        leading: dispatcherLeading(),
+        title: [{ kind: 'name', text: DISPATCHER_NAME }, { kind: 'text', text: 'marked the order for return' }],
+        timestamp: new Date(order.returnInfo.at),
+        blocks: [
+          { kind: 'status', icon: 'Order-Status', lead: 'Order status changed from', from: prev, to: 'returning' },
+          { kind: 'comment', text: order.returnInfo.reason },
+        ],
+        kind: 'event',
+      });
+    } else {
+      items.push({
+        id: 'returning',
+        leading: { kind: 'avatar', name: driverName, tone: driverTone },
+        title: [{ kind: 'name', text: driverName }, { kind: 'text', text: 'failed the order' }],
+        timestamp: bump(5 + (h % 20)),
+        blocks: [
+          { kind: 'status', icon: 'Order-Status', lead: 'Order status changed from', from: prev, to: 'returning' },
+          { kind: 'comment', text: MOCK_RETURN_REASONS[h % MOCK_RETURN_REASONS.length]! },
+        ],
+        kind: 'event',
+      });
+    }
     if (offPath === 'returned') {
       items.push({
         id: 'returned',
@@ -439,7 +517,7 @@ export function buildActivityTrail(model: OrderDetailModel, config: ClientConfig
     }
   }
 
-  return items;
+  return finalize(items);
 }
 
 /** "9 Jun 2027, 12:20 PM" per-entry timestamp — same format as the rest of the drawer. */

@@ -2,8 +2,17 @@
 
 > **Leta · Dispatcher Platform**
 > The authoritative cross-tab behaviour reference for the View Order drawer. Every row states what **all three tabs** show for one (client type × depot config × order origin × status) combination, so no tab can be built or reviewed in isolation.
-> **Status:** v1.0 — derived from the shipped implementation (2026-08-04), not aspirational.
+> **Status:** v1.1 — derived from the shipped implementation, not aspirational.
 > **Source of truth in code:** `apps/playground/src/lib/dispatchNarrative.ts` (the single provenance derivation) + `detailModel.ts` (Overview) + `activityModel.ts` (Activity) + `broadcastModel.ts` / `liveBroadcast.ts` (Dispatch Logs).
+>
+> **v1.1 correction (2026-08-07):** v1.0's "not aspirational" claim had quietly
+> stopped being true — a genuine implementation bug (the status-card title
+> reading a fixture's pinned `broadcastState` instead of the live sequence's
+> actual active leg, §3.2 below) had crept in since 2026-08-04 without anyone
+> re-walking this matrix against the running app to catch it. Fixed in
+> `broadcastModel.ts`; see the revision history at the bottom. This is the
+> reason a full re-audit (§9) followed rather than trusting the "shipped
+> implementation" label at face value.
 
 ---
 
@@ -199,6 +208,141 @@ Marketplace tenants don't manage drivers, so **driver groups don't exist**.
 
 ## 8. Open / deferred
 
-- **Real SLA stage clocks** await the Configuration spec (Doc 2). Duration and SLA state are currently deterministic mocks.
-- **Activity "Order Edited"** variant exists in Figma (`1487:173235`) but is not emitted — no edit-history model yet.
-- **`Dispatcher Activity (Return Order)`** ("{dispatcher} marked the order for return") is distinct from `Driver Activity (Failed)`; only the driver-failed path is currently emitted.
+- **Real SLA stage clocks — partially resolved (2026-08-07).** The Admin module
+  (`/settings`, Doc 2 §11) now holds a live, client-editable `sla` config —
+  the five stage durations are no longer hardcoded, and the Overview "{elapsed}
+  / {N}m SLA" denominator is genuinely derived from it (`expectedOftMinutes`).
+  **Still mocked:** each order's actual per-stage elapsed time and its
+  On-Time/At-Risk/Delayed state (`slaStateFor`/`durationSecondsFor` in
+  `orderMeta.ts`) are deterministic hashes of the order id, unrelated to the
+  configured durations — changing a client's SLA targets in Admin moves the
+  *denominator* every order is measured against, but not where any individual
+  order actually sits against it. Real per-order stage clocks remain future work.
+- ~~**Activity "Order Edited"** variant exists in Figma (`1487:173235`) but is not emitted — no edit-history model yet.~~
+  **Built 2026-08-07.** `Order.edits[]` (real, session-only) is appended
+  whenever the Edit Order drawer's save actually changes a field
+  (`recordOrderEdit`, `OrdersPage.tsx`'s `handleOrderEdited`), and rendered as
+  an "Order edited by {dispatcher}" entry — reusing the existing `actor` title
+  segment and `field` body block verbatim, no new types needed (Figma
+  `1487:173233` turned out to already match the `Driver changed from X to Y`
+  shape byte-for-byte). Merged into the trail at its real timestamp, then the
+  whole array is re-sorted chronologically — see §4a below.
+- ~~**`Dispatcher Activity (Return Order)`**~~ (`"{dispatcher} marked the order
+  for return"`) is distinct from `Driver Activity (Failed)`; only the
+  driver-failed path is currently emitted.
+  **Built 2026-08-07.** The Return Order action (row ⋯ menu, bulk toolbar, and
+  the drawer footer for `in-transit`/`arrived` orders) now opens a reason-capture
+  modal (`ReturnOrderModal`, mirroring `CancelOrderModal`'s shape) and calls a
+  new `returnOrder(id, reason)` store action, which sets `Order.returnInfo`
+  before transitioning to `returning`. The Activity trail branches on
+  `order.returnInfo`: present → the dispatcher-attributed shape (avatar +
+  "marked the order for return" + the typed reason, Figma `1489:183266`);
+  absent → the original driver-failed shape, unchanged, so every existing
+  seeded fixture (none of which set `returnInfo`) renders exactly as before.
+
+### 8a. Real edit / return history — precedence over the synthesized trail
+
+Two entries in the Activity trail are no longer synthesized from status alone:
+
+| Entry | Trigger | Data lives on |
+|---|---|---|
+| "Order edited by {dispatcher}" | Edit Order save with ≥1 changed field | `Order.edits[]` |
+| "{dispatcher} marked the order for return" | Return Order modal confirmed | `Order.returnInfo` |
+
+Both use the entry's **real** `Date` (`new Date()`/`new Date(edit.at)`), not the
+synthesized mock cursor the rest of the trail walks forward from a historical
+`createdAt`. `buildActivityTrail` appends them last and re-sorts the whole
+array by timestamp before returning, so a live edit or return correctly lands
+in chronological order relative to the synthesized history — in practice
+always at the top, since the mock trail's timestamps sit within roughly an
+hour of a `createdAt` that is usually days in the past, while a real action
+happens "now."
+
+---
+
+## 9. Re-audit (2026-08-07) — what prompted the v1.1 correction
+
+A direct code read of `broadcastModel.ts`/`liveBroadcast.ts` against §3/§4/§6,
+plus targeted live checks of what it surfaced, rather than a full click-through
+of every cell (an earlier attempt at scripting that through the UI proved too
+unreliable in this headless setup to trust its results either way).
+
+### 9.1 Confirmed and fixed this session
+
+**Dispatch Logs title ignored the real clock (Invariant #1 violation).** The
+status-card title's `onFallback` check was `leg?.kind === 'fallback' || state
+=== 'fallback'` — the `|| state === 'fallback'` half read the fixture's
+*pinned* review-shape label, not where the live sequence actually was. Any
+order pinned to the `fallback` shape said "Broadcasting to all nearby drivers
+[Fallback Round]" from the moment the drawer opened, even while the real clock
+was still on In-house [P1] — contradicting the Broadcast Logs timeline and
+Priority Driver Groups drill-down below it in the same render, which both read
+the clock correctly. Separately, `buildManagedLegs` only knew "which round
+have we reached," not "which leg within it," so it always marked the round's
+**last** group as live regardless of the clock's actual position, fabricating
+"already declined" history for groups that hadn't been reached yet. Both fixed
+in `broadcastModel.ts` (see its own history for the diff).
+
+### 9.2 Confirmed, not yet fixed
+
+**Manual Dispatch always routes through `broadcasted`, regardless of
+`broadcastCapable` — directly contradicts §5's "Broadcasted is unreachable."**
+`canDispatch()` (`OrdersPage.tsx`) gates on status group only; `dispatchOrder`
+unconditionally calls `updateOrderStatus(id, 'broadcasted')`. Verified live: a
+Naivas (profile B — `autoBroadcast: false`, its one depot has no `broadcast`
+ladder) Pending order, after clicking the Overview's "Dispatch" CTA, landed on:
+
+- Overview: *"Order broadcast started" / "0 drivers notified"* — claims an
+  automatic broadcast that this client's config says can never run.
+- Dispatch Logs: *On Hold* — *"Assign a driver to this order before broadcast
+  begins."* / *"Broadcast starts in 1 minute"* / *"When the order wait time
+  expires, the broadcast will run through all priority groups."* — describing
+  a sequence with no ladder to run through, plus a fabricated "10 batched
+  orders" count.
+
+Both tabs still *agree* with each other (Invariant #1 technically holds — this
+isn't a repeat of §9.1's bug), but what they agree on is incoherent for a
+client that cannot broadcast. Manual Dispatch needs its own path — most likely
+assigning a driver directly into `assigned` rather than passing through
+`broadcasted` at all — which is a real design decision (who gets picked, does
+it prompt a driver picker), not a one-line fix, so it's reported rather than
+guessed at here.
+
+**"Mark as Pending" (Update Status) doesn't free the driver, and can silently
+drop broadcast history.** `updateOrderStatus`'s terminal-state driver release
+only covers `delivered`/`cancelled`/`returned` — `pending` isn't in that list,
+so marking an Assigned+ order back to Pending leaves `driverId` set and the
+driver permanently `busy`, unreachable for new work. Separately,
+`resolveBroadcastState`'s `pending` branch reads `wasBroadcast = broadcastCapable
+&& (status === 'broadcasted' || !!order.batchId)` — a **broadcast**-dispatched
+order keeps its `batchId` and correctly resolves to `exhausted` (history
+preserved), but a **manually**-dispatched order (no `batchId`) resolves to
+`on-hold`, i.e. a fresh countdown as if it had never been touched — losing the
+fact that a driver already tried and failed. Doc 1's Update Status spec (v2.8,
+§10.1/§12.5–§12.9) doesn't currently say what should reset on this
+transition; worth a ruling before fixing.
+
+### 9.3 Verified correct
+
+- **Every §4 status row's Overview main/sub copy** (`detailModel.ts`) matches
+  the matrix text verbatim, including the exhausted-pending and profile-B
+  Pending variants.
+- **`scheduledOrigin`** (`dispatchNarrative.ts`) implements §1.3's rule exactly:
+  `scheduledOriginFor(order) && !(status === 'pending' && config.autoBroadcast)`.
+- **The Broadcast provenance icon** (`BROADCAST_ICON_ELIGIBLE`) excludes
+  `pending`/`scheduled`/`broadcasted`/`returned` exactly per Invariant #2 — this
+  directly answers the question that opened this audit: **no, the icon does
+  not reappear or persist once an order is back in Pending, even if a driver
+  had already accepted it.** The icon is a pure function of current status; it
+  has no memory.
+- **Profile C's isolation** — `fleetType` has zero references in
+  `detailModel.ts` / `activityModel.ts` / `dispatchNarrative.ts`; only
+  `broadcastModel.ts` reads it. §6's "Overview / Activity identical to profile
+  A" claim holds structurally, not by coincidence.
+
+## Revision history
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.1 | 2026-08-07 | §8 SLA item corrected to reflect the Admin module's now-editable `client.config.sla` (§8's OFT-derivation nuance); Order Edited and Dispatcher Activity (Return Order) built, §8 items resolved, new §8a documents how real edit/return history merges into the synthesized trail. New §9 re-audit: the `broadcastModel.ts` title/timeline bug fixed; two new confirmed-but-unfixed gaps reported (manual Dispatch bypassing `broadcastCapable`; Mark as Pending not freeing the driver / dropping manual-dispatch history) |
+| 1.0 | 2026-08-04 | Initial matrix, derived from the shipped implementation |
