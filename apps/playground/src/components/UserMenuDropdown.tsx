@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { DesktopDropdowns } from '@leta/components';
+import { DesktopDropdowns } from '@leta-io/components';
 import { useStore } from '../store/useStore.js';
 import { CURRENT_USER } from '../store/currentUser.js';
 import { Popover } from './Popover.js';

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon, type IconName } from '@leta/icons';
+import { Icon, type IconName } from '@leta-io/icons';
 
 export interface SearchFieldProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {

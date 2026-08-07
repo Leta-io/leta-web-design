@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
 
 export interface MapZoomControlProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Called when the zoom-in (+) button is clicked. */

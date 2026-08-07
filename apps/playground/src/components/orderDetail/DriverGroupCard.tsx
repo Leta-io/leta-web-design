@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Badge, ContentPrimitives, NotificationBanner } from '@leta/components';
-import { Icon, type IconName } from '@leta/icons';
+import { Badge, ContentPrimitives, NotificationBanner } from '@leta-io/components';
+import { Icon, type IconName } from '@leta-io/icons';
 import type { DriverGroup } from '../../store/types.js';
 import { ensureSpinnerStyles, prefersReducedMotion, SPINNER_CLASS, useBroadcastSignalIcon } from './broadcastSignal.js';
 
@@ -11,7 +11,7 @@ import { ensureSpinnerStyles, prefersReducedMotion, SPINNER_CLASS, useBroadcastS
  * rule. Rendered in the Dispatch Logs **Priority Driver Groups** drill-down, which
  * only exists for `managed-fleet` tenants (marketplace tenants have no groups).
  * Playground-local (matches the OrderOverviewCard / Picup Code Banner precedent) —
- * not promoted to `@leta/components`.
+ * not promoted to `@leta-io/components`.
  *
  * `broadcasting` swaps in the live "Broadcasting" badge + elapsed/found meta line +
  * top-pinned accent bar (Figma `State=Broadcasting`); otherwise the card shows its

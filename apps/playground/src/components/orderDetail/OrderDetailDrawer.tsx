@@ -22,8 +22,8 @@ import {
   Pagination,
   SIGNATURE_IMAGE,
   Skeleton,
-} from '@leta/components';
-import { Icon, type IconName } from '@leta/icons';
+} from '@leta-io/components';
+import { Icon, type IconName } from '@leta-io/icons';
 import { useStore } from '../../store/useStore.js';
 import type { Client, ClientConfig, Driver, Order, OrderStatus } from '../../store/types.js';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_BADGE_ICON, ORDER_STATUS_LABEL } from '../../store/types.js';
@@ -117,7 +117,7 @@ function useTicker(active: boolean): number {
 
 // ── Local building blocks (wireframe ad-hoc pieces — see adhoc-registry.json) ────
 
-/** White section card using the shared **Accordion Behaviour** (`@leta/components`):
+/** White section card using the shared **Accordion Behaviour** (`@leta-io/components`):
  *  hovering anywhere on the section-heading row highlights the trailing chevron,
  *  clicking toggles, and the body opens/closes with a smooth ease-in-out reveal.
  *  Mirrors the Figma "Order Detail Accordions" component (card: pad 20, radius xl,

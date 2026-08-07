@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
-import { tokens } from '@leta/design-tokens';
+import { tokens } from '@leta-io/design-tokens';
 
 /** Outlined 48×48 box whose border thickness equals the stroke token. */
 const StrokeBox = ({ cssVar }: { cssVar: string }) => (

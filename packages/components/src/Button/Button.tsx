@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon, type IconName, type IconSize } from '@leta/icons';
+import { Icon, type IconName, type IconSize } from '@leta-io/icons';
 
 /* ============================================================================
  * Axes
@@ -39,7 +39,7 @@ export interface ButtonProps
   size?: ButtonSize;
   /** Platform token set. Default: 'desktop'. */
   platform?: ButtonPlatform;
-  /** Leading icon (`IconName` from @leta/icons). With both iconLeft and iconRight + label, renders as Split Button. */
+  /** Leading icon (`IconName` from @leta-io/icons). With both iconLeft and iconRight + label, renders as Split Button. */
   iconLeft?: IconName;
   /** Trailing icon. */
   iconRight?: IconName;

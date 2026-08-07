@@ -1,5 +1,5 @@
 import * as React from 'react';
-import type { IconName } from '@leta/icons';
+import type { IconName } from '@leta-io/icons';
 import { ViewSwitcherTab } from '../ViewSwitcherTab/ViewSwitcherTab.js';
 import { SegmentSwitcherTab } from '../SegmentSwitcherTab/SegmentSwitcherTab.js';
 

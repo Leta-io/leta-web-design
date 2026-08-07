@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { DesktopMenuOptions } from '@leta/components';
+import { DesktopMenuOptions } from '@leta-io/components';
 import { useStore } from '../store/useStore.js';
 import { Popover, MenuPanel } from './Popover.js';
 

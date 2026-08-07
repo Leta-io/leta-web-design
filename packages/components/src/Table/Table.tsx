@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { type IconName } from '@leta/icons';
+import { type IconName } from '@leta-io/icons';
 import { Cell } from '../Cell/Cell.js';
 import { DataRows, type DataRowsVariant, type DataRowCell } from '../DataRows/DataRows.js';
 import { Pagination } from '../Pagination/Pagination.js';

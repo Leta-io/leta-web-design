@@ -26,13 +26,13 @@ importers:
 
   apps/playground:
     dependencies:
-      '@leta/components':
+      '@leta-io/components':
         specifier: workspace:*
         version: link:../../packages/components
-      '@leta/design-tokens':
+      '@leta-io/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
-      '@leta/icons':
+      '@leta-io/icons':
         specifier: workspace:*
         version: link:../../packages/icons
       leaflet:
@@ -72,13 +72,13 @@ importers:
 
   apps/storybook:
     dependencies:
-      '@leta/components':
+      '@leta-io/components':
         specifier: workspace:*
         version: link:../../packages/components
-      '@leta/design-tokens':
+      '@leta-io/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
-      '@leta/icons':
+      '@leta-io/icons':
         specifier: workspace:*
         version: link:../../packages/icons
       react:
@@ -140,10 +140,10 @@ importers:
 
   packages/components:
     dependencies:
-      '@leta/design-tokens':
+      '@leta-io/design-tokens':
         specifier: workspace:*
         version: link:../design-tokens
-      '@leta/icons':
+      '@leta-io/icons':
         specifier: workspace:*
         version: link:../icons
       country-flag-icons:

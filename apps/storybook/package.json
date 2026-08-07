@@ -11,9 +11,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@leta/components": "workspace:*",
-    "@leta/design-tokens": "workspace:*",
-    "@leta/icons": "workspace:*",
+    "@leta-io/components": "workspace:*",
+    "@leta-io/design-tokens": "workspace:*",
+    "@leta-io/icons": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

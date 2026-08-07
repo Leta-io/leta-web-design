@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
 import { Flag } from '../Flag/Flag.js';
 
 export type LeadingInputFieldElementVariant = 'single' | 'multiple';

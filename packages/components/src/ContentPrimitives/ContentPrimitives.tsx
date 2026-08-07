@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon, type IconName } from '@leta/icons';
+import { Icon, type IconName } from '@leta-io/icons';
 import { Avatar } from '../Avatar/Avatar.js';
 import { FeaturedIcon } from '../FeaturedIcon/FeaturedIcon.js';
 import { Badge, type BadgeColor } from '../Badge/Badge.js';

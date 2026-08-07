@@ -25,8 +25,8 @@ import {
   type TableColumn,
   type TableRow,
   type TopFilterSectionItem,
-} from '@leta/components';
-import type { IconName } from '@leta/icons';
+} from '@leta-io/components';
+import type { IconName } from '@leta-io/icons';
 import { useStore } from '../store/useStore.js';
 import type { NewOrderInput } from '../store/useStore.js';
 import type { DepotOption, Order, OrderStatus } from '../store/types.js';
@@ -86,7 +86,7 @@ function loadRowsPerPage(): number {
 // Columns dropdown; any active extra splices in before Status and switches the table
 // into horizontal-scroll mode (spec §4.3: pinned Order ID/Actions, middle scrolls).
 // Both LAST_UPDATED_COLUMN and CREATED_BY_COLUMN are canonical presets from
-// @leta/components — Created By renders the `user-cell` (avatar + name + email);
+// @leta-io/components — Created By renders the `user-cell` (avatar + name + email);
 // the playground only supplies the per-row name/email/avatarSrc data (from the
 // shared CREATORS mock in lib/orderMeta.ts — also used by the Order Detail drawer).
 type ExtraColumnKey = 'lastUpdated' | 'createdBy';

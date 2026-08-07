@@ -1,5 +1,5 @@
-import type { AvatarTone } from '@leta/components';
-import type { IconName } from '@leta/icons';
+import type { AvatarTone } from '@leta-io/components';
+import type { IconName } from '@leta-io/icons';
 import type { ClientConfig, OrderStatus } from '../../store/types.js';
 import { CURRENT_USER } from '../../store/currentUser.js';
 import { formatDateTime, idHash } from '../../lib/orderMeta.js';

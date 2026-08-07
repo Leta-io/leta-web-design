@@ -1,4 +1,4 @@
-import { AVATAR_PHOTOS } from '@leta/components';
+import { AVATAR_PHOTOS } from '@leta-io/components';
 import type { DepotOption, Order, OrderStatus } from '../store/types.js';
 import { CANCEL_REASONS } from '../components/CancelOrderModal.js';
 
@@ -44,7 +44,7 @@ export function formatDateTime(d: Date): string {
 
 // ── Created By (Table spec §2.2) ─────────────────────────────────────────────
 // Clustered/randomized creators — some carry a photo (the exact Figma Avatar
-// Photo 1/2/3 images, shipped as @leta/components assets), the rest render the
+// Photo 1/2/3 images, shipped as @leta-io/components assets), the rest render the
 // empty-teal avatar with their initials. Two automated sources are mixed in:
 // "Storefront" (Auto-create · From online store) and "API" (From connected app).
 export type Creator =

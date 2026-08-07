@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
 
 export type DesktopProgressIndicatorVariant = 'upload' | 'task' | 'system-process';
 

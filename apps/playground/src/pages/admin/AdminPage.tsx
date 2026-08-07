@@ -6,7 +6,7 @@ import {
   Sidetab,
   Title,
   type PageTabsControlItem,
-} from '@leta/components';
+} from '@leta-io/components';
 import {
   FLEET_MANAGEMENT_SECTIONS,
   ORDER_MANAGEMENT_SECTIONS,

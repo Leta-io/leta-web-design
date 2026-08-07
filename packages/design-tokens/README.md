@@ -1,4 +1,4 @@
-# @leta/design-tokens
+# @leta-io/design-tokens
 
 Generated design tokens for the LETA design system.
 

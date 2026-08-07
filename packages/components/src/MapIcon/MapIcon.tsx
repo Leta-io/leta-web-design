@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Icon } from '@leta/icons';
-import type { IconName } from '@leta/icons';
+import { Icon } from '@leta-io/icons';
+import type { IconName } from '@leta-io/icons';
 import { BIKE_DELIVERY_DATA_URI } from './bike-delivery-asset.js';
 
 export type MapIconVariant =

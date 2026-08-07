@@ -1,5 +1,5 @@
-import type { AvatarTone, BadgeColor } from '@leta/components';
-import type { IconName } from '@leta/icons';
+import type { AvatarTone, BadgeColor } from '@leta-io/components';
+import type { IconName } from '@leta-io/icons';
 
 /**
  * Order lifecycle (per user, 2026-06-25). Happy path:

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useParams } from 'react-router-dom';
-import { Title, NotificationBanner, Badge } from '@leta/components';
+import { Title, NotificationBanner, Badge } from '@leta-io/components';
 import { useStore } from '../store/useStore.js';
 import { ORDER_STATUS_BADGE, ORDER_STATUS_LABEL } from '../store/types.js';
 

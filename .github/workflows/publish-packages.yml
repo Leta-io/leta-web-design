@@ -1,0 +1,102 @@
+name: Publish packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    if: >-
+      (github.event_name == 'release' && github.event.release.target_commitish == 'master') ||
+      (github.event_name == 'workflow_dispatch' && github.ref_name == 'master')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: '@leta-io'
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Validate package versions
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const packages = [
+            'packages/design-tokens/package.json',
+            'packages/icons/package.json',
+            'packages/components/package.json',
+          ];
+          const versions = packages.map((file) => ({
+            file,
+            version: JSON.parse(fs.readFileSync(file, 'utf8')).version,
+          }));
+          const uniqueVersions = [...new Set(versions.map(({ version }) => version))];
+
+          if (uniqueVersions.length !== 1) {
+            console.error('Publish packages must share one version:');
+            for (const { file, version } of versions) {
+              console.error(`- ${file}: ${version}`);
+            }
+            process.exit(1);
+          }
+
+          const version = uniqueVersions[0];
+          if (version === '0.0.0') {
+            console.error('Refusing to publish placeholder version 0.0.0.');
+            process.exit(1);
+          }
+
+          const refName = process.env.GITHUB_REF_NAME || '';
+          if (process.env.GITHUB_EVENT_NAME === 'release') {
+            const tagVersion = refName.replace(/^v/, '');
+            if (tagVersion !== version) {
+              console.error(`Release tag ${refName} does not match package version ${version}.`);
+              process.exit(1);
+            }
+          }
+          NODE
+
+      - name: Build design tokens
+        run: bun run --cwd packages/design-tokens build
+
+      - name: Build icons
+        run: bun run --cwd packages/icons build
+
+      - name: Build components
+        run: bun run --cwd packages/components build
+
+      - name: Publish design tokens
+        run: bun publish
+        working-directory: packages/design-tokens
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish icons
+        run: bun publish
+        working-directory: packages/icons
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish components
+        run: bun publish
+        working-directory: packages/components
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.GITHUB_TOKEN }}

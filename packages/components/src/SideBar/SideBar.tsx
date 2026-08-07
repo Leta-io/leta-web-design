@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Icon, type IconName } from '@leta/icons';
+import { Icon, type IconName } from '@leta-io/icons';
 import { LetaLogo } from '../LetaLogo/LetaLogo.js';
 import { CollapsedSidebarLogo } from '../CollapsedSidebarLogo/CollapsedSidebarLogo.js';
 import { SearchInput } from '../SearchInput/SearchInput.js';
