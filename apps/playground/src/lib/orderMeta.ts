@@ -1,5 +1,5 @@
 import { AVATAR_PHOTOS } from '@leta-io/components';
-import type { DepotOption, Order, OrderStatus } from '../store/types.js';
+import type { DepotOption, Order } from '../store/types.js';
 import { CANCEL_REASONS } from '../components/CancelOrderModal.js';
 
 /**
@@ -13,7 +13,20 @@ import { CANCEL_REASONS } from '../components/CancelOrderModal.js';
  * model carries them (Doc 2 config + backend data).
  */
 
-export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 export function idHash(id: string): number {
   let s = 0;
@@ -53,11 +66,26 @@ export type Creator =
   | { source: 'api' };
 
 export const CREATORS: Creator[] = [
-  { source: 'human', name: 'Aisha Mohamed', email: 'aisha.mohamed@leta.ai', avatarSrc: AVATAR_PHOTOS[0] },
+  {
+    source: 'human',
+    name: 'Aisha Mohamed',
+    email: 'aisha.mohamed@leta.ai',
+    avatarSrc: AVATAR_PHOTOS[0],
+  },
   { source: 'human', name: 'Grace Wanjiru', email: 'grace.wanjiru@leta.ai' },
-  { source: 'human', name: 'Samuel Mwangi', email: 'samuel.mwangi@leta.ai', avatarSrc: AVATAR_PHOTOS[1] },
+  {
+    source: 'human',
+    name: 'Samuel Mwangi',
+    email: 'samuel.mwangi@leta.ai',
+    avatarSrc: AVATAR_PHOTOS[1],
+  },
   { source: 'human', name: 'Fatuma Hassan', email: 'fatuma.hassan@leta.ai' },
-  { source: 'human', name: 'Peter Kamau', email: 'peter.kamau@leta.ai', avatarSrc: AVATAR_PHOTOS[2] },
+  {
+    source: 'human',
+    name: 'Peter Kamau',
+    email: 'peter.kamau@leta.ai',
+    avatarSrc: AVATAR_PHOTOS[2],
+  },
   { source: 'storefront' },
   { source: 'api' },
 ];
@@ -199,8 +227,6 @@ export function mockCancellationFor(o: Order): { reasons: string[]; note: string
   const h = idHash(o.id);
   const pool = CANCEL_REASONS.filter((r) => r !== 'Other');
   const reasons =
-    h % 2 === 0
-      ? [pool[h % pool.length]!]
-      : [pool[h % pool.length]!, pool[(h + 1) % pool.length]!];
+    h % 2 === 0 ? [pool[h % pool.length]!] : [pool[h % pool.length]!, pool[(h + 1) % pool.length]!];
   return { reasons, note: MOCK_CANCEL_NOTES[h % MOCK_CANCEL_NOTES.length]! };
 }
