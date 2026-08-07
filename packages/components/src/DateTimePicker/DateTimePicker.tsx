@@ -340,13 +340,20 @@ export const DateTimePicker = React.forwardRef<HTMLDivElement, DateTimePickerPro
   if (type === 'date-time') {
     return (
       <div ref={ref} style={{ ...desktopCard, width: 418 }} {...rest}>
-        {/* Fixed 304px content (Figma Content szV:FIXED h304; card = 304 + 72 footer = 376). The
-            calendar (272 tall) hugs at the top with a 16px gap below it (inner height 288); the
-            demarcator + time column fill the height down to the footer. Bottom pad 0 (Figma 16/16/0/16). */}
-        <div style={{ display: 'flex', flexDirection: 'row', gap: 'var(--spacing-12px)', height: 304, boxSizing: 'border-box', padding: 'var(--padding-16px) var(--padding-16px) 0' }}>
+        {/* Content is 304px tall for the 5-row months Figma mocks (Content szV:FIXED h304;
+            card = 304 + 72 footer = 376), but it must be a MINIMUM, not a fixed height: a
+            month that spans six week rows (one starting on a Saturday, e.g. Aug 2026) makes
+            the calendar 40px taller, and a hard height let that sixth row paint outside the
+            content box and over the footer. Growing keeps Figma's exact geometry for every
+            4- and 5-row month and only gives up 40px when the month genuinely needs it.
+            Bottom pad stays 0 (Figma 16/16/0/16) so the time list runs flush to the footer
+            divider; the calendar's own padding-bottom owns the 16px gap below the grid. */}
+        <div style={{ display: 'flex', flexDirection: 'row', gap: 'var(--spacing-12px)', minHeight: 304, boxSizing: 'border-box', padding: 'var(--padding-16px) var(--padding-16px) 0' }}>
           {/* Date Picker is a fixed 272px frame in Figma (7×32 cells + 6×8 gaps) — keep
-              it fixed so the day grid aligns exactly; the time column flexes the rest. */}
-          <div style={{ width: 272, flexShrink: 0 }}>
+              it fixed so the day grid aligns exactly; the time column flexes the rest.
+              The 16px below the grid is explicit padding rather than leftover slack in the
+              304, so a six-row month keeps the same breathing room above the footer. */}
+          <div style={{ width: 272, flexShrink: 0, paddingBottom: 'var(--padding-16px)' }}>
             <Calendar year={view.year} month={view.month} selected={selected} onSelectDay={setSelected} onPrevMonth={prevMonth} onNextMonth={nextMonth} onPrevYear={prevYear} onNextYear={nextYear} />
           </div>
           <Demarcator vertical />
