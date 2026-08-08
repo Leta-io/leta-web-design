@@ -1,6 +1,6 @@
 {
   "name": "@leta-io/design-tokens",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": false,
   "description": "LETA design tokens — generated from Figma. Do not hand-edit dist/.",
   "type": "module",
